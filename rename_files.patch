@@ -1,0 +1,50 @@
+# HG changeset patch
+# Parent 14ea69c060081944edea66ca8e111172d806fa63
+
+diff -r 14ea69c06008 .hgignore
+--- a/.hgignore	Sun Apr 18 09:41:44 2010 +0200
++++ b/.hgignore	Thu Apr 22 07:30:37 2010 -0400
+@@ -14,3 +14,4 @@
+ ^env/
+ \.DS_Store$
+ ~$
++.*\.swp
+diff -r 14ea69c06008 setup.py
+--- a/setup.py	Sun Apr 18 09:41:44 2010 +0200
++++ b/setup.py	Thu Apr 22 07:30:37 2010 -0400
+@@ -156,14 +156,14 @@
+ 
+ 
+ setup(
+-    name='Sphinx',
++    name='hgblog',
+     version=sphinx.__version__,
+     url='http://sphinx.pocoo.org/',
+     download_url='http://pypi.python.org/pypi/Sphinx',
+     license='BSD',
+-    author='Georg Brandl',
+-    author_email='georg@python.org',
+-    description='Python documentation generator',
++    author='Georg Brandl, Josh VanderLinden',
++    author_email='georg@python.org, codekoala@gmail.com',
++    description='Sphinx-based blogging engine',
+     long_description=long_desc,
+     zip_safe=False,
+     classifiers=[
+@@ -182,12 +182,12 @@
+     include_package_data=True,
+     entry_points={
+         'console_scripts': [
+-            'sphinx-build = sphinx:main',
+-            'sphinx-quickstart = sphinx.quickstart:main',
+-            'sphinx-autogen = sphinx.ext.autosummary.generate:main',
++            'hgblog-build = sphinx:main',
++            'hgblog-quickstart = sphinx.quickstart:main',
++            'hgblog-autogen = sphinx.ext.autosummary.generate:main',
+         ],
+         'distutils.commands': [
+-            'build_sphinx = sphinx.setup_command:BuildDoc',
++            'build_hgblog = sphinx.setup_command:BuildDoc',
+         ],
+     },
+     install_requires=requires,
