@@ -1,9 +1,21 @@
 # HG changeset patch
 # Parent a3627c27a2f84b5a823bc585dc79c70e95c2193b
 
+diff -r a3627c27a2f8 setup.py
+--- a/setup.py	Thu Apr 22 13:01:32 2010 -0400
++++ b/setup.py	Fri Apr 23 11:26:23 2010 -0400
+@@ -41,7 +41,7 @@
+ <http://bitbucket.org/birkenfeld/sphinx/get/tip.gz#egg=Sphinx-dev>`_.
+ '''
+ 
+-requires = ['Pygments>=0.8', 'Jinja2>=2.2', 'docutils>=0.4']
++requires = ['Pygments>=0.8', 'Jinja2>=2.2', 'docutils>=0.4', 'mercurial>=1.5']
+ 
+ if sys.version_info < (2, 4):
+     print 'ERROR: Sphinx requires at least Python 2.4 to run.'
 diff -r a3627c27a2f8 sphinx/quickstart.py
 --- a/sphinx/quickstart.py	Thu Apr 22 13:01:32 2010 -0400
-+++ b/sphinx/quickstart.py	Thu Apr 22 14:12:15 2010 -0400
++++ b/sphinx/quickstart.py	Fri Apr 23 11:26:23 2010 -0400
 @@ -19,6 +19,7 @@
  from sphinx.util.console import purple, bold, red, turquoise, \
       nocolor, color_terminal

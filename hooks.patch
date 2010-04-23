@@ -1,5 +1,5 @@
 # HG changeset patch
-# Parent c79013bbc6ad186639e0a3f901808f5f934e7c67
+# Parent 9f22f388d2b183eac9896ec340cd816649acac8b
 
 diff --git a/hgblog/__init__.py b/hgblog/__init__.py
 new file mode 100644
@@ -19,11 +19,11 @@ new file mode 100644
 +    files_to_consider = repo[None].walk(m)
 +
 +    # tell Sphinx to HTML-ize the .rst files we found
-+    sphinxify((
++    args = [
 +        '-bdirhtml',
 +        '-dbuild/doctrees',
 +        'source',
 +        'build/html',
-+        ' '.join(files_to_consider),
-+    ))
++    ] + files_to_consider
++    sphinxify(args)
 +

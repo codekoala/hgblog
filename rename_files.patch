@@ -1,37 +1,170 @@
 # HG changeset patch
 # Parent 14ea69c060081944edea66ca8e111172d806fa63
 
-diff -r 14ea69c06008 .hgignore
---- a/.hgignore	Sun Apr 18 09:41:44 2010 +0200
-+++ b/.hgignore	Thu Apr 22 07:30:37 2010 -0400
+diff --git a/.hgignore b/.hgignore
+--- a/.hgignore
++++ b/.hgignore
 @@ -14,3 +14,4 @@
  ^env/
  \.DS_Store$
  ~$
 +.*\.swp
-diff -r 14ea69c06008 setup.py
---- a/setup.py	Sun Apr 18 09:41:44 2010 +0200
-+++ b/setup.py	Thu Apr 22 07:30:37 2010 -0400
-@@ -156,14 +156,14 @@
+diff --git a/README b/README
+--- a/README
++++ b/README
+@@ -1,32 +1,49 @@
+ .. -*- restructuredtext -*-
+ 
+-=================
+-README for Sphinx
+-=================
++HgBlog is a set of modifications to the Sphinx project to make it slightly more 
++suitable as a blogging engine.  It's built for those of us who love using
++reStructuredText markup to write documents.
+ 
+-Installing
+-==========
++The quickstart wizard handles setting up an HgBlog for you.  This includes all
++of the usual things that the Sphinx quickstart utility does, but it creates a
++Mercurial repository and installs a hook and intelligent ignores for you.  The
++hook will automatically convert the ``.rst`` files that Mercurial is tracking
++into HTML using Sphinx when you commit changes to the repository.
+ 
+-Use ``setup.py``::
++Additionally, when you pull changes in from a remote clone of the repository, 
++the hook will do the conversion just like when you commit locally.  You can set
++the hook up on remote clones as well.  The hook *only* converts ``.rst`` files
++that are tracked by Mercurial.  This means you can work on new blog articles 
++without committing them to the repository to have them not appear online.
+ 
+-   python setup.py build
+-   sudo python setup.py install
++--------
+ 
++Sphinx is a tool that makes it easy to create intelligent and beautiful
++documentation for Python projects (or other documents consisting of multiple
++reStructuredText sources), written by Georg Brandl.  It was originally created
++for the new Python documentation, and has excellent facilities for Python
++project documentation, but C/C++ is supported as well, and more languages are
++planned.
+ 
+-Reading the docs
+-================
++Sphinx uses reStructuredText as its markup language, and many of its strengths
++come from the power and straightforwardness of reStructuredText and its parsing
++and translating suite, the Docutils.
+ 
+-After installing::
++Among its features are the following:
+ 
+-   cd doc
+-   sphinx-build . _build/html
++* Output formats: HTML (including derivative formats such as HTML Help, Epub
++  and Qt Help), plain text, manual pages and LaTeX or direct PDF output
++  using rst2pdf
++* Extensive cross-references: semantic markup and automatic links
++  for functions, classes, glossary terms and similar pieces of information
++* Hierarchical structure: easy definition of a document tree, with automatic
++  links to siblings, parents and children
++* Automatic indices: general index as well as a module index
++* Code handling: automatic highlighting using the Pygments highlighter
++* Flexible HTML output using the Jinja 2 templating engine
++* Various extensions are available, e.g. for automatic testing of snippets
++  and inclusion of appropriately formatted docstrings
++* Setuptools integration
+ 
+-Then, direct your browser to ``_build/html/index.html``.
+-
+-Or read them online at <http://sphinx.pocoo.org/>.
+-
+-
+-Contributing
+-============
+-
+-Send wishes, comments, patches, etc. to sphinx-dev@googlegroups.com.
++A development egg can be found `here
++<http://bitbucket.org/birkenfeld/sphinx/get/tip.gz#egg=Sphinx-dev>`_.
+diff --git a/README.rst b/README.rst
+new file mode 120000
+--- /dev/null
++++ b/README.rst
+@@ -0,0 +1,1 @@
++README
+\ No newline at end of file
+diff --git a/hgblog/__init__.py b/hgblog/__init__.py
+new file mode 100644
+--- /dev/null
++++ b/hgblog/__init__.py
+@@ -0,0 +1,1 @@
++__version__ = '0.1a'
+diff --git a/setup.py b/setup.py
+--- a/setup.py
++++ b/setup.py
+@@ -7,39 +7,10 @@
+ from setuptools import setup, find_packages
+ from distutils import log
+ 
++import hgblog
+ import sphinx
+ 
+-long_desc = '''
+-Sphinx is a tool that makes it easy to create intelligent and beautiful
+-documentation for Python projects (or other documents consisting of multiple
+-reStructuredText sources), written by Georg Brandl.  It was originally created
+-for the new Python documentation, and has excellent facilities for Python
+-project documentation, but C/C++ is supported as well, and more languages are
+-planned.
+-
+-Sphinx uses reStructuredText as its markup language, and many of its strengths
+-come from the power and straightforwardness of reStructuredText and its parsing
+-and translating suite, the Docutils.
+-
+-Among its features are the following:
+-
+-* Output formats: HTML (including derivative formats such as HTML Help, Epub
+-  and Qt Help), plain text, manual pages and LaTeX or direct PDF output
+-  using rst2pdf
+-* Extensive cross-references: semantic markup and automatic links
+-  for functions, classes, glossary terms and similar pieces of information
+-* Hierarchical structure: easy definition of a document tree, with automatic
+-  links to siblings, parents and children
+-* Automatic indices: general index as well as a module index
+-* Code handling: automatic highlighting using the Pygments highlighter
+-* Flexible HTML output using the Jinja 2 templating engine
+-* Various extensions are available, e.g. for automatic testing of snippets
+-  and inclusion of appropriately formatted docstrings
+-* Setuptools integration
+-
+-A development egg can be found `here
+-<http://bitbucket.org/birkenfeld/sphinx/get/tip.gz#egg=Sphinx-dev>`_.
+-'''
++long_desc = open('README').read()
+ 
+ requires = ['Pygments>=0.8', 'Jinja2>=2.2', 'docutils>=0.4']
+ 
+@@ -156,14 +127,14 @@
  
  
  setup(
 -    name='Sphinx',
+-    version=sphinx.__version__,
+-    url='http://sphinx.pocoo.org/',
+-    download_url='http://pypi.python.org/pypi/Sphinx',
 +    name='hgblog',
-     version=sphinx.__version__,
-     url='http://sphinx.pocoo.org/',
-     download_url='http://pypi.python.org/pypi/Sphinx',
++    version=hgblog.__version__,
++    url='http://bitbucket.org/codekoala/hgblog/',
++    download_url='http://pypi.python.org/pypi/hgblog',
      license='BSD',
 -    author='Georg Brandl',
 -    author_email='georg@python.org',
 -    description='Python documentation generator',
-+    author='Georg Brandl, Josh VanderLinden',
-+    author_email='georg@python.org, codekoala@gmail.com',
++    author='Josh VanderLinden',
++    author_email='codekoala@gmail.com',
 +    description='Sphinx-based blogging engine',
      long_description=long_desc,
      zip_safe=False,
      classifiers=[
-@@ -182,12 +182,12 @@
+@@ -182,12 +153,12 @@
      include_package_data=True,
      entry_points={
          'console_scripts': [
