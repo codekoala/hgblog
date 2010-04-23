@@ -67,7 +67,7 @@ diff --git a/setup.py b/setup.py
  import sphinx
  
  long_desc = '''
-@@ -156,14 +157,14 @@
+@@ -156,15 +157,15 @@
  
  
  setup(
@@ -83,12 +83,14 @@ diff --git a/setup.py b/setup.py
 -    author='Georg Brandl',
 -    author_email='georg@python.org',
 -    description='Python documentation generator',
+-    long_description=long_desc,
 +    author='Josh VanderLinden',
 +    author_email='codekoala@gmail.com',
 +    description='Sphinx-based blogging engine',
-     long_description=long_desc,
++    long_description=open('README').read(),
      zip_safe=False,
      classifiers=[
+         'Development Status :: 4 - Beta',
 @@ -182,12 +183,12 @@
      include_package_data=True,
      entry_points={
