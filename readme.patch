@@ -3,8 +3,8 @@
 
 diff -r b16e101c48d3 README
 --- a/README	Fri Apr 23 11:53:30 2010 -0400
-+++ b/README	Fri Apr 23 12:02:06 2010 -0400
-@@ -1,33 +1,45 @@
++++ b/README	Fri Apr 23 12:19:58 2010 -0400
+@@ -1,33 +1,78 @@
  .. -*- restructuredtext -*-
  
 -=================
@@ -74,4 +74,37 @@ diff -r b16e101c48d3 README
 +    hg qapply -a
 +    python setup.py install
 +
++Getting Started
++===============
++
++HgBlog leverages the existing quickstart wizard for Sphinx projects.  There 
++are some modifications to reduce the number of steps required, so you should
++be able to be up and running within a minute using::
++
++    hgblog-quickstart
++
++All you need to do is:
++
++* Provide the directory on your filesystem that shall be used for your blogging
++  needs.
++* Provide a name for your blog
++* Provide your name
++* Select any extensions you may want to include in your blog
++
++Once you do that, you should have a few new directories, one of which will be 
++called ``source``.  This is where you should write your ``.rst`` articles.  When
++you're done working on a particular article, you can use::
++
++    hg add
++    hg ci
++
++...to add and commit it to your Mercurial repository.  At this point, Sphinx will
++be asked to generate the HTML for your blog based on your ``.rst`` files.
++
++TODOs
++=====
++
++* Implement Disqus commenting
++* Add RSS feeds
++* Include a simple, static HTML web server for faster results
 +
