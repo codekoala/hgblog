@@ -1,0 +1,77 @@
+# HG changeset patch
+# Parent b16e101c48d3294ec1f8a80f04be94a808a32b64
+
+diff -r b16e101c48d3 README
+--- a/README	Fri Apr 23 11:53:30 2010 -0400
++++ b/README	Fri Apr 23 12:02:06 2010 -0400
+@@ -1,33 +1,45 @@
+ .. -*- restructuredtext -*-
+ 
+-=================
+-README for Sphinx
+-=================
++HgBlog is a set of modifications to the Sphinx project to make it slightly more 
++suitable as a blogging engine.  It's built for those of us who love using
++reStructuredText markup to write documents.
+ 
+-Installing
+-==========
++The quickstart wizard handles setting up an HgBlog for you.  This includes all
++of the usual things that the Sphinx quickstart utility does, but it creates a
++Mercurial repository and installs a hook and intelligent ignores for you.  The
++hook will automatically convert the ``.rst`` files that Mercurial is tracking
++into HTML using Sphinx when you commit changes to the repository.
+ 
+-Use ``setup.py``::
++Additionally, when you pull changes in from a remote clone of the repository, 
++the hook will do the conversion just like when you commit locally.  You can set
++the hook up on remote clones as well.  The hook *only* converts ``.rst`` files
++that are tracked by Mercurial.  This means you can work on new blog articles 
++without committing them to the repository to have them not appear online.
+ 
+-    python setup.py build
+-    sudo python setup.py install
+-
+-
+-Reading the docs
+-================
+-
+-After installing::
+-
+-    cd doc
+-    sphinx-build . _build/html
+-
+-Then, direct your browser to ``_build/html/index.html``.
+-
+-Or read them online at <http://sphinx.pocoo.org>.
+-
+-
+-Contributing
++Installation
+ ============
+ 
+-Send wishes, comments, patches, etc. to sphinx-dev@googlegroups.com.
++There are several ways to install HgBlog:
+ 
++* Using ``pip`` (recommended)::
++
++    pip install -U hgblog
++
++* Using ``easy_install``::
++
++    easy_install hgblog
++
++* From the CheeseShop
++
++    * Download the ``.tar.gz`` file from `PyPI <http://2ze.us/m2M>`_
++    * Extract the ``.tar.gz`` file
++    * Run ``python setup.py install`` using the ``setup.py`` in the extracted directory
++
++* Using Mercurial::
++
++    hg qclone http://bitbucket.org/codekoala/hgblog
++    cd hgblog
++    hg qapply -a
++    python setup.py install
++
++
