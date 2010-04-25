@@ -1,0 +1,2983 @@
+# HG changeset patch
+# Parent ea003da8d9ea9446534fef1de24f40c1162ce66d
+
+diff --git a/sphinx/builders/changes.py b/sphinx/builders/changes.py
+--- a/sphinx/builders/changes.py
++++ b/sphinx/builders/changes.py
+@@ -97,6 +97,8 @@
+             'otherchanges': sorted(otherchanges.iteritems()),
+             'show_copyright': self.config.html_show_copyright,
+             'show_sphinx': self.config.html_show_sphinx,
++            'enable_comments': self.config.enable_comments,
++            'disqus_site': self.config.disqus_site,
+         }
+         f = codecs.open(path.join(self.outdir, 'index.html'), 'w', 'utf8')
+         try:
+diff --git a/sphinx/builders/html.py b/sphinx/builders/html.py
+--- a/sphinx/builders/html.py
++++ b/sphinx/builders/html.py
+@@ -302,6 +302,8 @@
+             docstitle = self.config.html_title,
+             shorttitle = self.config.html_short_title,
+             show_copyright = self.config.html_show_copyright,
++            enable_comments = self.config.enable_comments,
++            disqus_site = self.config.disqus_site,
+             show_sphinx = self.config.html_show_sphinx,
+             has_source = self.config.html_copy_source,
+             show_source = self.config.html_show_sourcelink,
+diff --git a/sphinx/config.py b/sphinx/config.py
+--- a/sphinx/config.py
++++ b/sphinx/config.py
+@@ -31,6 +31,8 @@
+         # general options
+         project = ('Python', 'env'),
+         copyright = ('', 'html'),
++        enable_comments = (False, 'env'),
++        disqus_site = ('', 'env'),
+         version = ('', 'env'),
+         release = ('', 'env'),
+         today = ('', 'env'),
+diff --git a/sphinx/themes/conjunction/changes/frameset.html b/sphinx/themes/conjunction/changes/frameset.html
+new file mode 100644
+--- /dev/null
++++ b/sphinx/themes/conjunction/changes/frameset.html
+@@ -0,0 +1,11 @@
++<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Frameset//EN"
++  "http://www.w3.org/TR/html4/frameset.dtd">
++<html>
++  <head>
++    <title>{% trans version=version|e, docstitle=docstitle|e %}Changes in Version {{ version }} &mdash; {{ docstitle }}{% endtrans %}</title>
++  </head>
++  <frameset cols="45%,*">
++    <frame name="main" src="changes.html">
++    <frame name="src" src="about:blank">
++  </frameset>
++</html>
+diff --git a/sphinx/themes/conjunction/changes/rstsource.html b/sphinx/themes/conjunction/changes/rstsource.html
+new file mode 100644
+--- /dev/null
++++ b/sphinx/themes/conjunction/changes/rstsource.html
+@@ -0,0 +1,15 @@
++<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
++  "http://www.w3.org/TR/html4/loose.dtd">
++<html>
++  <head>
++    <title>{% trans filename=filename, docstitle=docstitle|e %}{{ filename }} &mdash; {{ docstitle }}{% endtrans %}</title>
++    <style type="text/css">
++      .hl { background-color: yellow }
++    </style>
++  </head>
++  <body style="font-size: 90%">
++    <pre>
++      {{ text }}
++    </pre>
++  </body>
++</html>
+diff --git a/sphinx/themes/conjunction/changes/versionchanges.html b/sphinx/themes/conjunction/changes/versionchanges.html
+new file mode 100644
+--- /dev/null
++++ b/sphinx/themes/conjunction/changes/versionchanges.html
+@@ -0,0 +1,33 @@
++{% macro entries(changes) %}
++<ul>{% for entry, docname, lineno in changes %}
++<li><a href="rst/{{ docname }}.html#L{{ lineno-10 }}" target="src">{{ entry }}</a></li>
++{% endfor %}</ul>
++{% endmacro -%}
++<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
++  "http://www.w3.org/TR/html4/loose.dtd">
++<html>
++  <head>
++    <link rel="stylesheet" href="default.css">
++    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
++    <title>{% trans version=version|e, docstitle=docstitle|e %}Changes in Version {{ version }} &mdash; {{ docstitle }}{% endtrans %}</title>
++  </head>
++  <body>
++    <div class="document">
++      <div class="body">
++    <h1>{% trans version=version|e %}Automatically generated list of changes in version {{ version }}{% endtrans %}</h1>
++    <h2>{{ _('Library changes') }}</h2>
++    {% for modname, changes in libchanges %}
++    <h4>{{ modname }}</h4>
++    {{ entries(changes) }}
++    {% endfor %}
++    <h2>{{ _('C API changes') }}</h2>
++    {{ entries(apichanges) }}
++    <h2>{{ _('Other changes') }}</h2>
++    {% for (fn, title), changes in otherchanges %}
++    <h4>{{ title }} <span style="font-size: 50%">({{ fn }})</span></h4>
++    {{ entries(changes) }}
++    {% endfor %}
++      </div>
++    </div>
++  </body>
++</html>
+diff --git a/sphinx/themes/conjunction/defindex.html b/sphinx/themes/conjunction/defindex.html
+new file mode 100644
+--- /dev/null
++++ b/sphinx/themes/conjunction/defindex.html
+@@ -0,0 +1,26 @@
++{% extends "layout.html" %}
++{% set title = _('Overview') %}
++{% block body %}
++  <h1>{{ docstitle|e }}</h1>
++  <p>
++    Welcome! This is
++    {% block description %}the documentation for {{ project|e }}
++    {{ release|e }}{% if last_updated %}, last updated {{ last_updated|e }}{% endif %}{% endblock %}.
++  </p>
++  {% block tables %}
++  <p><strong>{{ _('Indices and tables:') }}</strong></p>
++  <table class="contentstable" align="center"><tr>
++    <td width="50%">
++      <p class="biglink"><a class="biglink" href="{{ pathto("contents") }}">{{ _('Complete Table of Contents') }}</a><br>
++         <span class="linkdescr">{{ _('lists all sections and subsections') }}</span></p>
++      <p class="biglink"><a class="biglink" href="{{ pathto("search") }}">{{ _('Search Page') }}</a><br>
++         <span class="linkdescr">{{ _('search this documentation') }}</span></p>
++    </td><td width="50%">
++      <p class="biglink"><a class="biglink" href="{{ pathto("modindex") }}">{{ _('Global Module Index') }}</a><br>
++         <span class="linkdescr">{{ _('quick access to all modules') }}</span></p>
++      <p class="biglink"><a class="biglink" href="{{ pathto("genindex") }}">{{ _('General Index') }}</a><br>
++         <span class="linkdescr">{{ _('all functions, classes, terms') }}</span></p>
++    </td></tr>
++  </table>
++  {% endblock %}
++{% endblock %}
+diff --git a/sphinx/themes/conjunction/domainindex.html b/sphinx/themes/conjunction/domainindex.html
+new file mode 100644
+--- /dev/null
++++ b/sphinx/themes/conjunction/domainindex.html
+@@ -0,0 +1,48 @@
++{% extends "layout.html" %}
++{% set title = indextitle %}
++{% block extrahead %}
++{{ super() }}
++{% if not embedded and collapse_index %}
++    <script type="text/javascript">
++      DOCUMENTATION_OPTIONS.COLLAPSE_INDEX = true;
++    </script>
++{% endif %}
++{% endblock %}
++{% block body %}
++
++   {%- set curr_group = 0 %}
++
++   <h1>{{ indextitle }}</h1>
++
++   <div class="modindex-jumpbox">
++   {%- for (letter, entries) in content %}
++   <a href="#cap-{{ letter }}"><strong>{{ letter }}</strong></a>
++     {%- if not loop.last %} | {% endif %}
++   {%- endfor %}
++   </div>
++
++   <table class="indextable modindextable" cellspacing="0" cellpadding="2">
++   {%- for letter, entries in content %}
++     <tr class="pcap"><td></td><td>&nbsp;</td><td></td></tr>
++     <tr class="cap"><td></td><td><a name="cap-{{ letter }}">
++           <strong>{{ letter }}</strong></a></td><td></td></tr>
++     {%- for (name, grouptype, page, anchor, extra, qualifier, description)
++             in entries %}
++     {%- if grouptype == 1 %}{% set curr_group = curr_group + 1 %}{% endif %}
++     <tr{% if grouptype == 2 %} class="cg-{{ curr_group }}"{% endif %}>
++       <td>{% if grouptype == 1 -%}
++         <img src="{{ pathto('_static/minus.png', 1) }}" id="toggle-{{ curr_group }}"
++              class="toggler" style="display: none" alt="-" />
++           {%- endif %}</td>
++       <td>{% if grouptype == 2 %}&nbsp;&nbsp;&nbsp;{% endif %}
++       {% if page %}<a href="{{ pathto(page) }}#{{ anchor }}">{% endif -%}
++       <tt class="xref">{{ name|e }}</tt>
++       {%- if page %}</a>{% endif %}
++     {%- if extra %} <em>({{ extra|e }})</em>{% endif -%}
++     </td><td>{% if qualifier %}<strong>{{ qualifier|e }}:</strong>{% endif %}
++       <em>{{ description|e }}</em></td></tr>
++     {%- endfor %}
++   {%- endfor %}
++   </table>
++
++{% endblock %}
+diff --git a/sphinx/themes/conjunction/genindex-single.html b/sphinx/themes/conjunction/genindex-single.html
+new file mode 100644
+--- /dev/null
++++ b/sphinx/themes/conjunction/genindex-single.html
+@@ -0,0 +1,39 @@
++{% extends "layout.html" %}
++{% set title = _('Index') %}
++{% block body %}
++
++   <h1 id="index">{% trans key=key %}Index &ndash; {{ key }}{% endtrans %}</h1>
++
++<table width="100%" class="indextable"><tr>
++  {%- for column in entries|slice(2) if column %}
++  <td width="33%" valign="top"><dl>
++  {%- for entryname, (links, subitems) in column %}
++    <dt>{% if links %}<a href="{{ links[0] }}">{{ entryname|e }}</a>
++      {%- for link in links[1:] %}, <a href="{{ link }}">[{{ loop.index }}]</a>{% endfor %}
++      {%- else %}{{ entryname|e }}{% endif %}</dt>
++    {%- if subitems %}
++    <dd><dl>
++    {%- for subentryname, subentrylinks in subitems %}
++      <dt><a href="{{ subentrylinks[0] }}">{{ subentryname|e }}</a>
++      {%- for link in subentrylinks[1:] %}, <a href="{{ link }}">[{{ loop.index }}]</a>{% endfor -%}
++      </dt>
++    {%- endfor %}
++  </dl></dd>
++  {%- endif -%}
++{%- endfor %}
++</dl></td>
++{%- endfor %}
++</tr></table>
++
++{% endblock %}
++
++{% block sidebarrel %}
++   <h4>Index</h4>
++   <p>{% for key, dummy in genindexentries -%}
++   <a href="{{ pathto('genindex-' + key) }}"><strong>{{ key }}</strong></a>
++     {% if not loop.last %}| {% endif %}
++   {%- endfor %}</p>
++
++   <p><a href="{{ pathto('genindex-all') }}"><strong>{{ _('Full index on one page') }}</strong></a></p>
++   {{ super() }}
++{% endblock %}
+diff --git a/sphinx/themes/conjunction/genindex-split.html b/sphinx/themes/conjunction/genindex-split.html
+new file mode 100644
+--- /dev/null
++++ b/sphinx/themes/conjunction/genindex-split.html
+@@ -0,0 +1,32 @@
++{% extends "layout.html" %}
++{% set title = _('Index') %}
++{% block body %}
++
++   <h1 id="index">{{ _('Index') }}</h1>
++
++   <p>{{ _('Index pages by letter') }}:</p>
++
++   <div class="genindex-jumpbox">
++   <p>{% for key, dummy in genindexentries -%}
++   <a href="{{ pathto('genindex-' + key) }}"><strong>{{ key }}</strong></a>
++     {% if not loop.last %}| {% endif %}
++   {%- endfor %}</p>
++
++   <p><a href="{{ pathto('genindex-all') }}"><strong>{{ _('Full index on one page') }}</strong>
++                                               ({{ _('can be huge') }})</a></p>
++   </div>
++
++{% endblock %}
++
++{% block sidebarrel %}
++{% if split_index %}
++   <h4>Index</h4>
++   <p>{% for key, dummy in genindexentries -%}
++   <a href="{{ pathto('genindex-' + key) }}"><strong>{{ key }}</strong></a>
++     {% if not loop.last %}| {% endif %}
++   {%- endfor %}</p>
++
++   <p><a href="{{ pathto('genindex-all') }}"><strong>{{ _('Full index on one page') }}</strong></a></p>
++{% endif %}
++   {{ super() }}
++{% endblock %}
+diff --git a/sphinx/themes/conjunction/genindex.html b/sphinx/themes/conjunction/genindex.html
+new file mode 100644
+--- /dev/null
++++ b/sphinx/themes/conjunction/genindex.html
+@@ -0,0 +1,50 @@
++{% extends "layout.html" %}
++{% set title = _('Index') %}
++{% block body %}
++
++   <h1 id="index">{{ _('Index') }}</h1>
++
++   <div class="genindex-jumpbox">
++   {% for key, dummy in genindexentries -%}
++   <a href="#{{ key }}"><strong>{{ key }}</strong></a> {% if not loop.last %}| {% endif %}
++   {%- endfor %}
++   </div>
++
++   {%- for key, entries in genindexentries %}
++<h2 id="{{ key }}">{{ key }}</h2>
++<table width="100%" class="indextable genindextable"><tr>
++  {%- for column in entries|slice(2) if column %}
++  <td width="33%" valign="top"><dl>
++  {%- for entryname, (links, subitems) in column %}
++    <dt>{% if links %}<a href="{{ links[0] }}">{{ entryname|e }}</a>
++      {%- for link in links[1:] %}, <a href="{{ link }}">[{{ loop.index }}]</a>{% endfor %}
++      {%- else %}{{ entryname|e }}{% endif %}</dt>
++    {%- if subitems %}
++    <dd><dl>
++    {%- for subentryname, subentrylinks in subitems %}
++      <dt><a href="{{ subentrylinks[0] }}">{{ subentryname|e }}</a>
++      {%- for link in subentrylinks[1:] %}, <a href="{{ link }}">[{{ loop.index }}]</a>{% endfor -%}
++      </dt>
++    {%- endfor %}
++  </dl></dd>
++  {%- endif -%}
++{%- endfor %}
++</dl></td>
++{%- endfor %}
++</tr></table>
++{% endfor %}
++
++{% endblock %}
++
++{% block sidebarrel %}
++{% if split_index %}
++   <h4>{{ _('Index') }}</h4>
++   <p>{% for key, dummy in genindexentries -%}
++   <a href="{{ pathto('genindex-' + key) }}"><strong>{{ key }}</strong></a>
++     {% if not loop.last %}| {% endif %}
++   {%- endfor %}</p>
++
++   <p><a href="{{ pathto('genindex-all') }}"><strong>{{ _('Full index on one page') }}</strong></a></p>
++{% endif %}
++   {{ super() }}
++{% endblock %}
+diff --git a/sphinx/themes/conjunction/globaltoc.html b/sphinx/themes/conjunction/globaltoc.html
+new file mode 100644
+--- /dev/null
++++ b/sphinx/themes/conjunction/globaltoc.html
+@@ -0,0 +1,2 @@
++<h3><a href="{{ pathto(master_doc) }}">{{ _('Contents') }}</a></h3>
++{{ toctree() }}
+diff --git a/sphinx/themes/conjunction/layout.html b/sphinx/themes/conjunction/layout.html
+new file mode 100644
+--- /dev/null
++++ b/sphinx/themes/conjunction/layout.html
+@@ -0,0 +1,200 @@
++{%- block doctype -%}
++<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
++<!--
++Design by Free CSS Templates
++http://www.freecsstemplates.org
++Released for free under a Creative Commons Attribution 2.5 License
++
++Name       : Conjunction 
++Description: A two-column, fixed-width design for 1024x768 screen resolutions.
++Version    : 1.0
++Released   : 20100328
++
++-->
++{%- endblock %}
++{%- set reldelim1 = reldelim1 is not defined and ' &raquo;' or reldelim1 %}
++{%- set reldelim2 = reldelim2 is not defined and ' |' or reldelim2 %}
++{%- set url_root = pathto('', 1) %}
++{%- if url_root == '#' %}{% set url_root = '' %}{% endif %}
++
++{%- macro relbar() %}
++    <div class="related">
++      <h3>{{ _('Navigation') }}</h3>
++      <ul>
++        {%- for rellink in rellinks %}
++        <li class="right" {% if loop.first %}style="margin-right: 0px"{% endif %}>
++          <a href="{{ pathto(rellink[0]) }}" title="{{ rellink[1]|striptags }}"
++             {{ accesskey(rellink[2]) }}>{{ rellink[3] }}</a>
++          {%- if not loop.first %}{{ reldelim2 }}{% endif %}</li>
++        {%- endfor %}
++        {%- block rootrellink %}
++        <li><a href="{{ pathto(master_doc) }}">{{ shorttitle|e }}</a>{{ reldelim1 }}</li>
++        {%- endblock %}
++        {%- for parent in parents %}
++          <li><a href="{{ parent.link|e }}" {% if loop.last %}{{ accesskey("U") }}{% endif %}>{{ parent.title }}</a>{{ reldelim1 }}</li>
++        {%- endfor %}
++        {%- block relbaritems %} {% endblock %}
++      </ul>
++    </div>
++{%- endmacro %}
++
++<html xmlns="http://www.w3.org/1999/xhtml">
++<head>
++<meta http-equiv="content-type" content="text/html; charset={{ encoding }}" />
++{{ metatags }}
++{%- if not embedded and docstitle %}
++  {%- set titlesuffix = " &mdash; "|safe + docstitle|e %}
++{%- else %}
++  {%- set titlesuffix = "" %}
++{%- endif %}
++{%- block htmltitle %}
++<title>{{ title|striptags }}{{ titlesuffix }}</title>
++{%- endblock %}
++<link rel="stylesheet" href="{{ pathto('_static/' + style, 1) }}" type="text/css" />
++<link rel="stylesheet" href="{{ pathto('_static/pygments.css', 1) }}" type="text/css" />
++{%- for cssfile in css_files %}
++<link rel="stylesheet" href="{{ pathto(cssfile, 1) }}" type="text/css" />
++{%- endfor %}
++{%- if not embedded %}
++<script type="text/javascript">
++  var DOCUMENTATION_OPTIONS = {
++    URL_ROOT:    '{{ url_root }}',
++    COLLAPSE_INDEX: false,
++    FILE_SUFFIX: '{{ file_suffix }}',
++    HAS_SOURCE:  {{ has_source|lower }}
++  };
++</script>
++{%- for scriptfile in script_files %}
++<script type="text/javascript" src="{{ pathto(scriptfile, 1) }}"></script>
++{%- endfor %}
++{%- if use_opensearch %}
++<link rel="search" type="application/opensearchdescription+xml"
++      title="{% trans docstitle=docstitle|e %}Search within {{ docstitle }}{% endtrans %}"
++      href="{{ pathto('_static/opensearch.xml', 1) }}"/>
++{%- endif %}
++{%- if favicon %}
++<link rel="shortcut icon" href="{{ pathto('_static/' + favicon, 1) }}"/>
++{%- endif %}
++{%- endif %}
++{%- block linktags %}
++{%- if hasdoc('about') %}
++<link rel="author" title="{{ _('About these documents') }}" href="{{ pathto('about') }}" />
++{%- endif %}
++{%- if hasdoc('genindex') %}
++<link rel="index" title="{{ _('Index') }}" href="{{ pathto('genindex') }}" />
++{%- endif %}
++{%- if hasdoc('search') %}
++<link rel="search" title="{{ _('Search') }}" href="{{ pathto('search') }}" />
++{%- endif %}
++{%- if hasdoc('copyright') %}
++<link rel="copyright" title="{{ _('Copyright') }}" href="{{ pathto('copyright') }}" />
++{%- endif %}
++<link rel="top" title="{{ docstitle|e }}" href="{{ pathto('index') }}" />
++{%- if parents %}
++<link rel="up" title="{{ parents[-1].title|striptags }}" href="{{ parents[-1].link|e }}" />
++{%- endif %}
++{%- if next %}
++<link rel="next" title="{{ next.title|striptags }}" href="{{ next.link|e }}" />
++{%- endif %}
++{%- if prev %}
++<link rel="prev" title="{{ prev.title|striptags }}" href="{{ prev.link|e }}" />
++{%- endif %}
++{%- endblock %}
++{%- block extrahead %} {% endblock %}
++</head>
++<body>
++{%- block header %}{% endblock %}
++  <div id="logo">
++    <h1><a href="{{ pathto('index') }}">{{ docstitle }}</a></h1>
++    <p><em>{{ title|striptags }}</em></p>
++  </div>
++  <hr />
++  <!-- end #logo -->
++  <div id="header">
++    <div id="menu">
++      <ul>
++        <li><a href="{{ pathto('index') }}" class="first">Home</a></li>
++        <li><a href="{{ pathto('about') }}">About</a></li>
++      </ul>
++    </div>
++    <!-- end #menu -->
++    <div id="search">
++    {%- include "searchbox.html" %}
++    </div>
++    <!-- end #search -->
++  </div>
++  <!-- end #header -->
++  <!-- end #header-wrapper -->
++  <div id="page">
++
++
++    <div id="content" class="post document">
++{%- block relbar1 %}{{ relbar() }}{% endblock %}
++{%- block content %}
++
++    <div class="document">
++    {%- block document %}
++    {% block body %} {% endblock %}
++    {%- endblock %}
++    <div class="clearer"></div>
++    </div>
++{%- block relbar2 %}{{ relbar() }}{% endblock %}
++{%- endblock %}
++
++{%- if enable_comments %}
++{%- if not disqus_site %}
++<p>Please configure your <strong>disqus_site</strong> in order to enable comments.</p>
++{%- else %}
++    <div id="disqus_thread"></div>
++    <script type="text/javascript">
++    /**
++    * var disqus_identifier; [Optional but recommended: Define a unique identifier (e.g. post id or slug) for this thread] 
++    */
++    var disqus_developer = 1;
++    (function() {
++     var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
++     dsq.src = 'http://{{ disqus_site }}.disqus.com/embed.js';
++     (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
++    })();
++    </script>
++    <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript={{ disqus_site }}">comments powered by Disqus.</a></noscript>
++    <a href="http://disqus.com" class="dsq-brlink">blog comments powered by <span class="logo-disqus">Disqus</span></a>
++{%- endif %}
++{%- endif %}
++
++    </div><!-- end #content -->
++
++    <div id="sidebar">
++      <ul>
++        {%- include "localtoc.html" %}
++        {%- include "relations.html" %}
++        {%- include "sourcelink.html" %}
++      </ul>
++    </div>
++    <!-- end #sidebar -->
++    <div class="clearer"></div>
++  </div>
++
++  <!-- end #page -->
++{%- block footer %}
++  <div id="footer">
++    <p>
++    {%- if show_copyright %}
++      {%- if hasdoc('copyright') %}
++        {% trans path=pathto('copyright'), copyright=copyright|e %}&copy; <a href="{{ path }}">Copyright</a> {{ copyright }}.{% endtrans %}
++      {%- else %}
++        {% trans copyright=copyright|e %}&copy; Copyright {{ copyright }}.{% endtrans %}
++      {%- endif %}
++    {%- endif %}
++    {%- if last_updated %}
++      {% trans last_updated=last_updated|e %}Last updated on {{ last_updated }}.{% endtrans %}
++    {%- endif %}
++    {%- if show_sphinx %}
++      {% trans sphinx_version=sphinx_version|e %}Created using <a href="http://bitbucket.org/codekoala/hgblog/">HgBlog</a> &amp; <a href="http://sphinx.pocoo.org/">Sphinx</a> {{ sphinx_version }}.{% endtrans %}
++    {%- endif %}
++    </p>
++    </div>
++{%- endblock %}
++  <!-- end #footer -->
++</body>
++</html>
+diff --git a/sphinx/themes/conjunction/license.txt b/sphinx/themes/conjunction/license.txt
+new file mode 100644
+--- /dev/null
++++ b/sphinx/themes/conjunction/license.txt
+@@ -0,0 +1,63 @@
++Creative Commons Attribution 3.0 Unported
++=========================================
++
++License
++
++THE WORK (AS DEFINED BELOW) IS PROVIDED UNDER THE TERMS OF THIS CREATIVE COMMONS PUBLIC LICENSE ("CCPL" OR "LICENSE"). THE WORK IS PROTECTED BY COPYRIGHT AND/OR OTHER APPLICABLE LAW. ANY USE OF THE WORK OTHER THAN AS AUTHORIZED UNDER THIS LICENSE OR COPYRIGHT LAW IS PROHIBITED.
++
++BY EXERCISING ANY RIGHTS TO THE WORK PROVIDED HERE, YOU ACCEPT AND AGREE TO BE BOUND BY THE TERMS OF THIS LICENSE. TO THE EXTENT THIS LICENSE MAY BE CONSIDERED TO BE A CONTRACT, THE LICENSOR GRANTS YOU THE RIGHTS CONTAINED HERE IN CONSIDERATION OF YOUR ACCEPTANCE OF SUCH TERMS AND CONDITIONS.
++
++1. Definitions
++
++   1. "Adaptation" means a work based upon the Work, or upon the Work and other pre-existing works, such as a translation, adaptation, derivative work, arrangement of music or other alterations of a literary or artistic work, or phonogram or performance and includes cinematographic adaptations or any other form in which the Work may be recast, transformed, or adapted including in any form recognizably derived from the original, except that a work that constitutes a Collection will not be considered an Adaptation for the purpose of this License. For the avoidance of doubt, where the Work is a musical work, performance or phonogram, the synchronization of the Work in timed-relation with a moving image ("synching") will be considered an Adaptation for the purpose of this License.
++   2. "Collection" means a collection of literary or artistic works, such as encyclopedias and anthologies, or performances, phonograms or broadcasts, or other works or subject matter other than works listed in Section 1(f) below, which, by reason of the selection and arrangement of their contents, constitute intellectual creations, in which the Work is included in its entirety in unmodified form along with one or more other contributions, each constituting separate and independent works in themselves, which together are assembled into a collective whole. A work that constitutes a Collection will not be considered an Adaptation (as defined above) for the purposes of this License.
++   3. "Distribute" means to make available to the public the original and copies of the Work or Adaptation, as appropriate, through sale or other transfer of ownership.
++   4. "Licensor" means the individual, individuals, entity or entities that offer(s) the Work under the terms of this License.
++   5. "Original Author" means, in the case of a literary or artistic work, the individual, individuals, entity or entities who created the Work or if no individual or entity can be identified, the publisher; and in addition (i) in the case of a performance the actors, singers, musicians, dancers, and other persons who act, sing, deliver, declaim, play in, interpret or otherwise perform literary or artistic works or expressions of folklore; (ii) in the case of a phonogram the producer being the person or legal entity who first fixes the sounds of a performance or other sounds; and, (iii) in the case of broadcasts, the organization that transmits the broadcast.
++   6. "Work" means the literary and/or artistic work offered under the terms of this License including without limitation any production in the literary, scientific and artistic domain, whatever may be the mode or form of its expression including digital form, such as a book, pamphlet and other writing; a lecture, address, sermon or other work of the same nature; a dramatic or dramatico-musical work; a choreographic work or entertainment in dumb show; a musical composition with or without words; a cinematographic work to which are assimilated works expressed by a process analogous to cinematography; a work of drawing, painting, architecture, sculpture, engraving or lithography; a photographic work to which are assimilated works expressed by a process analogous to photography; a work of applied art; an illustration, map, plan, sketch or three-dimensional work relative to geography, topography, architecture or science; a performance; a broadcast; a phonogram; a compilation of data to the extent it is protected as a copyrightable work; or a work performed by a variety or circus performer to the extent it is not otherwise considered a literary or artistic work.
++   7. "You" means an individual or entity exercising rights under this License who has not previously violated the terms of this License with respect to the Work, or who has received express permission from the Licensor to exercise rights under this License despite a previous violation.
++   8. "Publicly Perform" means to perform public recitations of the Work and to communicate to the public those public recitations, by any means or process, including by wire or wireless means or public digital performances; to make available to the public Works in such a way that members of the public may access these Works from a place and at a place individually chosen by them; to perform the Work to the public by any means or process and the communication to the public of the performances of the Work, including by public digital performance; to broadcast and rebroadcast the Work by any means including signs, sounds or images.
++   9. "Reproduce" means to make copies of the Work by any means including without limitation by sound or visual recordings and the right of fixation and reproducing fixations of the Work, including storage of a protected performance or phonogram in digital form or other electronic medium.
++
++2. Fair Dealing Rights. Nothing in this License is intended to reduce, limit, or restrict any uses free from copyright or rights arising from limitations or exceptions that are provided for in connection with the copyright protection under copyright law or other applicable laws.
++
++3. License Grant. Subject to the terms and conditions of this License, Licensor hereby grants You a worldwide, royalty-free, non-exclusive, perpetual (for the duration of the applicable copyright) license to exercise the rights in the Work as stated below:
++
++   1. to Reproduce the Work, to incorporate the Work into one or more Collections, and to Reproduce the Work as incorporated in the Collections;
++   2. to create and Reproduce Adaptations provided that any such Adaptation, including any translation in any medium, takes reasonable steps to clearly label, demarcate or otherwise identify that changes were made to the original Work. For example, a translation could be marked "The original work was translated from English to Spanish," or a modification could indicate "The original work has been modified.";
++   3. to Distribute and Publicly Perform the Work including as incorporated in Collections; and,
++   4. to Distribute and Publicly Perform Adaptations.
++   5.
++
++      For the avoidance of doubt:
++         1. Non-waivable Compulsory License Schemes. In those jurisdictions in which the right to collect royalties through any statutory or compulsory licensing scheme cannot be waived, the Licensor reserves the exclusive right to collect such royalties for any exercise by You of the rights granted under this License;
++         2. Waivable Compulsory License Schemes. In those jurisdictions in which the right to collect royalties through any statutory or compulsory licensing scheme can be waived, the Licensor waives the exclusive right to collect such royalties for any exercise by You of the rights granted under this License; and,
++         3. Voluntary License Schemes. The Licensor waives the right to collect royalties, whether individually or, in the event that the Licensor is a member of a collecting society that administers voluntary licensing schemes, via that society, from any exercise by You of the rights granted under this License.
++
++The above rights may be exercised in all media and formats whether now known or hereafter devised. The above rights include the right to make such modifications as are technically necessary to exercise the rights in other media and formats. Subject to Section 8(f), all rights not expressly granted by Licensor are hereby reserved.
++
++4. Restrictions. The license granted in Section 3 above is expressly made subject to and limited by the following restrictions:
++
++   1. You may Distribute or Publicly Perform the Work only under the terms of this License. You must include a copy of, or the Uniform Resource Identifier (URI) for, this License with every copy of the Work You Distribute or Publicly Perform. You may not offer or impose any terms on the Work that restrict the terms of this License or the ability of the recipient of the Work to exercise the rights granted to that recipient under the terms of the License. You may not sublicense the Work. You must keep intact all notices that refer to this License and to the disclaimer of warranties with every copy of the Work You Distribute or Publicly Perform. When You Distribute or Publicly Perform the Work, You may not impose any effective technological measures on the Work that restrict the ability of a recipient of the Work from You to exercise the rights granted to that recipient under the terms of the License. This Section 4(a) applies to the Work as incorporated in a Collection, but this does not require the Collection apart from the Work itself to be made subject to the terms of this License. If You create a Collection, upon notice from any Licensor You must, to the extent practicable, remove from the Collection any credit as required by Section 4(b), as requested. If You create an Adaptation, upon notice from any Licensor You must, to the extent practicable, remove from the Adaptation any credit as required by Section 4(b), as requested.
++   2. If You Distribute, or Publicly Perform the Work or any Adaptations or Collections, You must, unless a request has been made pursuant to Section 4(a), keep intact all copyright notices for the Work and provide, reasonable to the medium or means You are utilizing: (i) the name of the Original Author (or pseudonym, if applicable) if supplied, and/or if the Original Author and/or Licensor designate another party or parties (e.g., a sponsor institute, publishing entity, journal) for attribution ("Attribution Parties") in Licensor's copyright notice, terms of service or by other reasonable means, the name of such party or parties; (ii) the title of the Work if supplied; (iii) to the extent reasonably practicable, the URI, if any, that Licensor specifies to be associated with the Work, unless such URI does not refer to the copyright notice or licensing information for the Work; and (iv) , consistent with Section 3(b), in the case of an Adaptation, a credit identifying the use of the Work in the Adaptation (e.g., "French translation of the Work by Original Author," or "Screenplay based on original Work by Original Author"). The credit required by this Section 4 (b) may be implemented in any reasonable manner; provided, however, that in the case of a Adaptation or Collection, at a minimum such credit will appear, if a credit for all contributing authors of the Adaptation or Collection appears, then as part of these credits and in a manner at least as prominent as the credits for the other contributing authors. For the avoidance of doubt, You may only use the credit required by this Section for the purpose of attribution in the manner set out above and, by exercising Your rights under this License, You may not implicitly or explicitly assert or imply any connection with, sponsorship or endorsement by the Original Author, Licensor and/or Attribution Parties, as appropriate, of You or Your use of the Work, without the separate, express prior written permission of the Original Author, Licensor and/or Attribution Parties.
++   3. Except as otherwise agreed in writing by the Licensor or as may be otherwise permitted by applicable law, if You Reproduce, Distribute or Publicly Perform the Work either by itself or as part of any Adaptations or Collections, You must not distort, mutilate, modify or take other derogatory action in relation to the Work which would be prejudicial to the Original Author's honor or reputation. Licensor agrees that in those jurisdictions (e.g. Japan), in which any exercise of the right granted in Section 3(b) of this License (the right to make Adaptations) would be deemed to be a distortion, mutilation, modification or other derogatory action prejudicial to the Original Author's honor and reputation, the Licensor will waive or not assert, as appropriate, this Section, to the fullest extent permitted by the applicable national law, to enable You to reasonably exercise Your right under Section 3(b) of this License (right to make Adaptations) but not otherwise.
++
++5. Representations, Warranties and Disclaimer
++
++UNLESS OTHERWISE MUTUALLY AGREED TO BY THE PARTIES IN WRITING, LICENSOR OFFERS THE WORK AS-IS AND MAKES NO REPRESENTATIONS OR WARRANTIES OF ANY KIND CONCERNING THE WORK, EXPRESS, IMPLIED, STATUTORY OR OTHERWISE, INCLUDING, WITHOUT LIMITATION, WARRANTIES OF TITLE, MERCHANTIBILITY, FITNESS FOR A PARTICULAR PURPOSE, NONINFRINGEMENT, OR THE ABSENCE OF LATENT OR OTHER DEFECTS, ACCURACY, OR THE PRESENCE OF ABSENCE OF ERRORS, WHETHER OR NOT DISCOVERABLE. SOME JURISDICTIONS DO NOT ALLOW THE EXCLUSION OF IMPLIED WARRANTIES, SO SUCH EXCLUSION MAY NOT APPLY TO YOU.
++
++6. Limitation on Liability. EXCEPT TO THE EXTENT REQUIRED BY APPLICABLE LAW, IN NO EVENT WILL LICENSOR BE LIABLE TO YOU ON ANY LEGAL THEORY FOR ANY SPECIAL, INCIDENTAL, CONSEQUENTIAL, PUNITIVE OR EXEMPLARY DAMAGES ARISING OUT OF THIS LICENSE OR THE USE OF THE WORK, EVEN IF LICENSOR HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
++
++7. Termination
++
++   1. This License and the rights granted hereunder will terminate automatically upon any breach by You of the terms of this License. Individuals or entities who have received Adaptations or Collections from You under this License, however, will not have their licenses terminated provided such individuals or entities remain in full compliance with those licenses. Sections 1, 2, 5, 6, 7, and 8 will survive any termination of this License.
++   2. Subject to the above terms and conditions, the license granted here is perpetual (for the duration of the applicable copyright in the Work). Notwithstanding the above, Licensor reserves the right to release the Work under different license terms or to stop distributing the Work at any time; provided, however that any such election will not serve to withdraw this License (or any other license that has been, or is required to be, granted under the terms of this License), and this License will continue in full force and effect unless terminated as stated above.
++
++8. Miscellaneous
++
++   1. Each time You Distribute or Publicly Perform the Work or a Collection, the Licensor offers to the recipient a license to the Work on the same terms and conditions as the license granted to You under this License.
++   2. Each time You Distribute or Publicly Perform an Adaptation, Licensor offers to the recipient a license to the original Work on the same terms and conditions as the license granted to You under this License.
++   3. If any provision of this License is invalid or unenforceable under applicable law, it shall not affect the validity or enforceability of the remainder of the terms of this License, and without further action by the parties to this agreement, such provision shall be reformed to the minimum extent necessary to make such provision valid and enforceable.
++   4. No term or provision of this License shall be deemed waived and no breach consented to unless such waiver or consent shall be in writing and signed by the party to be charged with such waiver or consent.
++   5. This License constitutes the entire agreement between the parties with respect to the Work licensed here. There are no understandings, agreements or representations with respect to the Work not specified here. Licensor shall not be bound by any additional provisions that may appear in any communication from You. This License may not be modified without the mutual written agreement of the Licensor and You.
++   6. The rights granted under, and the subject matter referenced, in this License were drafted utilizing the terminology of the Berne Convention for the Protection of Literary and Artistic Works (as amended on September 28, 1979), the Rome Convention of 1961, the WIPO Copyright Treaty of 1996, the WIPO Performances and Phonograms Treaty of 1996 and the Universal Copyright Convention (as revised on July 24, 1971). These rights and subject matter take effect in the relevant jurisdiction in which the License terms are sought to be enforced according to the corresponding provisions of the implementation of those treaty provisions in the applicable national law. If the standard suite of rights granted under applicable copyright law includes additional rights not granted under this License, such additional rights are deemed to be included in the License; this License is not intended to restrict the license of any rights under applicable law.
+diff --git a/sphinx/themes/conjunction/localtoc.html b/sphinx/themes/conjunction/localtoc.html
+new file mode 100644
+--- /dev/null
++++ b/sphinx/themes/conjunction/localtoc.html
+@@ -0,0 +1,6 @@
++{%- if display_toc %}
++<li>
++  <h2><a href="{{ pathto(master_doc) }}">{{ _('Contents') }}</a></h2>
++  {{ toc }}
++</li>
++{%- endif %}
+diff --git a/sphinx/themes/conjunction/opensearch.xml b/sphinx/themes/conjunction/opensearch.xml
+new file mode 100644
+--- /dev/null
++++ b/sphinx/themes/conjunction/opensearch.xml
+@@ -0,0 +1,10 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
++  <ShortName>{{ project|e }}</ShortName>
++  <Description>{% trans docstitle=docstitle|e %}Search {{ docstitle }}{% endtrans %}</Description>
++  <InputEncoding>utf-8</InputEncoding>
++  <Url type="text/html" method="get"
++       template="{{ use_opensearch }}/{{ pathto('search') }}?q={searchTerms}&amp;check_keywords=yes&amp;area=default"/>
++  <LongName>{{ docstitle|e }}</LongName>
++{% block extra %} {# Put e.g. an <Image> element here. #} {% endblock %}
++</OpenSearchDescription>
+diff --git a/sphinx/themes/conjunction/page.html b/sphinx/themes/conjunction/page.html
+new file mode 100644
+--- /dev/null
++++ b/sphinx/themes/conjunction/page.html
+@@ -0,0 +1,4 @@
++{% extends "layout.html" %}
++{% block body %}
++  {{ body }}
++{% endblock %}
+diff --git a/sphinx/themes/conjunction/relations.html b/sphinx/themes/conjunction/relations.html
+new file mode 100644
+--- /dev/null
++++ b/sphinx/themes/conjunction/relations.html
+@@ -0,0 +1,14 @@
++{%- if prev %}
++<li>
++  <h2>{{ _('Previous topic') }}</h2>
++  <p class="topless"><a href="{{ prev.link|e }}"
++                        title="{{ _('previous chapter') }}">{{ prev.title }}</a></p>
++</li>
++{%- endif %}
++{%- if next %}
++<li>
++  <h2>{{ _('Next topic') }}</h2>
++  <p class="topless"><a href="{{ next.link|e }}"
++                        title="{{ _('next chapter') }}">{{ next.title }}</a></p>
++</li>
++{%- endif %}
+diff --git a/sphinx/themes/conjunction/search.html b/sphinx/themes/conjunction/search.html
+new file mode 100644
+--- /dev/null
++++ b/sphinx/themes/conjunction/search.html
+@@ -0,0 +1,45 @@
++{% extends "layout.html" %}
++{% set title = _('Search') %}
++{% set script_files = script_files + ['_static/searchtools.js'] %}
++{% block body %}
++  <h1 id="search-documentation">{{ _('Search') }}</h1>
++  <div id="fallback" class="admonition warning">
++  <script type="text/javascript">$('#fallback').hide();</script>
++  <p>
++    {% trans %}Please activate JavaScript to enable the search
++    functionality.{% endtrans %}
++  </p>
++  </div>
++  <p>
++    {% trans %}From here you can search these documents. Enter your search
++    words into the box below and click "search". Note that the search
++    function will automatically search for all of the words. Pages
++    containing fewer words won't appear in the result list.{% endtrans %}
++  </p>
++  <form action="" method="get">
++    <input type="text" name="q" value="" />
++    <input type="submit" value="{{ _('search') }}" />
++    <span id="search-progress" style="padding-left: 10px"></span>
++  </form>
++  {% if search_performed %}
++    <h2>{{ _('Search Results') }}</h2>
++    {% if not search_results %}
++      <p>{{ _('Your search did not match any results.') }}</p>
++    {% endif %}
++  {% endif %}
++  <div id="search-results">
++  {% if search_results %}
++    <ul>
++    {% for href, caption, context in search_results %}
++      <li><a href="{{ pathto(item.href) }}">{{ caption }}</a>
++        <div class="context">{{ context|e }}</div>
++      </li>
++    {% endfor %}
++    </ul>
++  {% endif %}
++  </div>
++{% endblock %}
++{% block footer %}
++  {{ super() }}
++  <script type="text/javascript" src="{{ pathto('searchindex.js', 1) }}"></script>
++{% endblock %}
+diff --git a/sphinx/themes/conjunction/searchbox.html b/sphinx/themes/conjunction/searchbox.html
+new file mode 100644
+--- /dev/null
++++ b/sphinx/themes/conjunction/searchbox.html
+@@ -0,0 +1,8 @@
++{%- if pagename != "search" %}
++<form class="search" action="{{ pathto('search') }}" method="get">
++  <input type="text" name="q" size="18" id="search-text" />
++  <input type="submit" value="{{ _('Go') }}" id="search-submit" />
++  <input type="hidden" name="check_keywords" value="yes" />
++  <input type="hidden" name="area" value="default" />
++</form>
++{%- endif %}
+diff --git a/sphinx/themes/conjunction/sourcelink.html b/sphinx/themes/conjunction/sourcelink.html
+new file mode 100644
+--- /dev/null
++++ b/sphinx/themes/conjunction/sourcelink.html
+@@ -0,0 +1,9 @@
++{%- if show_source and has_source and sourcename %}
++<li>
++  <h2>{{ _('This Page') }}</h2>
++  <ul class="this-page-menu">
++    <li><a href="{{ pathto('_sources/' + sourcename, true)|e }}"
++           rel="nofollow">{{ _('Show Source') }}</a></li>
++  </ul>
++</li>
++{%- endif %}
+diff --git a/sphinx/themes/conjunction/static/doctools.js b/sphinx/themes/conjunction/static/doctools.js
+new file mode 100644
+--- /dev/null
++++ b/sphinx/themes/conjunction/static/doctools.js
+@@ -0,0 +1,247 @@
++/*
++ * doctools.js
++ * ~~~~~~~~~~~
++ *
++ * Sphinx JavaScript utilties for all documentation.
++ *
++ * :copyright: Copyright 2007-2010 by the Sphinx team, see AUTHORS.
++ * :license: BSD, see LICENSE for details.
++ *
++ */
++
++/**
++ * select a different prefix for underscore
++ */
++$u = _.noConflict();
++
++/**
++ * make the code below compatible with browsers without
++ * an installed firebug like debugger
++if (!window.console || !console.firebug) {
++  var names = ["log", "debug", "info", "warn", "error", "assert", "dir",
++    "dirxml", "group", "groupEnd", "time", "timeEnd", "count", "trace",
++    "profile", "profileEnd"];
++  window.console = {};
++  for (var i = 0; i < names.length; ++i)
++    window.console[names[i]] = function() {};
++}
++ */
++
++/**
++ * small helper function to urldecode strings
++ */
++jQuery.urldecode = function(x) {
++  return decodeURIComponent(x).replace(/\+/g, ' ');
++}
++
++/**
++ * small helper function to urlencode strings
++ */
++jQuery.urlencode = encodeURIComponent;
++
++/**
++ * This function returns the parsed url parameters of the
++ * current request. Multiple values per key are supported,
++ * it will always return arrays of strings for the value parts.
++ */
++jQuery.getQueryParameters = function(s) {
++  if (typeof s == 'undefined')
++    s = document.location.search;
++  var parts = s.substr(s.indexOf('?') + 1).split('&');
++  var result = {};
++  for (var i = 0; i < parts.length; i++) {
++    var tmp = parts[i].split('=', 2);
++    var key = jQuery.urldecode(tmp[0]);
++    var value = jQuery.urldecode(tmp[1]);
++    if (key in result)
++      result[key].push(value);
++    else
++      result[key] = [value];
++  }
++  return result;
++};
++
++/**
++ * small function to check if an array contains
++ * a given item.
++ */
++jQuery.contains = function(arr, item) {
++  for (var i = 0; i < arr.length; i++) {
++    if (arr[i] == item)
++      return true;
++  }
++  return false;
++};
++
++/**
++ * highlight a given string on a jquery object by wrapping it in
++ * span elements with the given class name.
++ */
++jQuery.fn.highlightText = function(text, className) {
++  function highlight(node) {
++    if (node.nodeType == 3) {
++      var val = node.nodeValue;
++      var pos = val.toLowerCase().indexOf(text);
++      if (pos >= 0 && !jQuery(node.parentNode).hasClass(className)) {
++        var span = document.createElement("span");
++        span.className = className;
++        span.appendChild(document.createTextNode(val.substr(pos, text.length)));
++        node.parentNode.insertBefore(span, node.parentNode.insertBefore(
++          document.createTextNode(val.substr(pos + text.length)),
++          node.nextSibling));
++        node.nodeValue = val.substr(0, pos);
++      }
++    }
++    else if (!jQuery(node).is("button, select, textarea")) {
++      jQuery.each(node.childNodes, function() {
++        highlight(this);
++      });
++    }
++  }
++  return this.each(function() {
++    highlight(this);
++  });
++};
++
++/**
++ * Small JavaScript module for the documentation.
++ */
++var Documentation = {
++
++  init : function() {
++    this.fixFirefoxAnchorBug();
++    this.highlightSearchWords();
++    this.initIndexTable();
++  },
++
++  /**
++   * i18n support
++   */
++  TRANSLATIONS : {},
++  PLURAL_EXPR : function(n) { return n == 1 ? 0 : 1; },
++  LOCALE : 'unknown',
++
++  // gettext and ngettext don't access this so that the functions
++  // can savely bound to a different name (_ = Documentation.gettext)
++  gettext : function(string) {
++    var translated = Documentation.TRANSLATIONS[string];
++    if (typeof translated == 'undefined')
++      return string;
++    return (typeof translated == 'string') ? translated : translated[0];
++  },
++
++  ngettext : function(singular, plural, n) {
++    var translated = Documentation.TRANSLATIONS[singular];
++    if (typeof translated == 'undefined')
++      return (n == 1) ? singular : plural;
++    return translated[Documentation.PLURALEXPR(n)];
++  },
++
++  addTranslations : function(catalog) {
++    for (var key in catalog.messages)
++      this.TRANSLATIONS[key] = catalog.messages[key];
++    this.PLURAL_EXPR = new Function('n', 'return +(' + catalog.plural_expr + ')');
++    this.LOCALE = catalog.locale;
++  },
++
++  /**
++   * add context elements like header anchor links
++   */
++  addContextElements : function() {
++    $('div[id] > :header:first').each(function() {
++      $('<a class="headerlink">\u00B6</a>').
++      attr('href', '#' + this.id).
++      attr('title', _('Permalink to this headline')).
++      appendTo(this);
++    });
++    $('dt[id]').each(function() {
++      $('<a class="headerlink">\u00B6</a>').
++      attr('href', '#' + this.id).
++      attr('title', _('Permalink to this definition')).
++      appendTo(this);
++    });
++  },
++
++  /**
++   * workaround a firefox stupidity
++   */
++  fixFirefoxAnchorBug : function() {
++    if (document.location.hash && $.browser.mozilla)
++      window.setTimeout(function() {
++        document.location.href += '';
++      }, 10);
++  },
++
++  /**
++   * highlight the search words provided in the url in the text
++   */
++  highlightSearchWords : function() {
++    var params = $.getQueryParameters();
++    var terms = (params.highlight) ? params.highlight[0].split(/\s+/) : [];
++    if (terms.length) {
++      var body = $('div.body');
++      window.setTimeout(function() {
++        $.each(terms, function() {
++          body.highlightText(this.toLowerCase(), 'highlighted');
++        });
++      }, 10);
++      $('<li class="highlight-link"><a href="javascript:Documentation.' +
++        'hideSearchWords()">' + _('Hide Search Matches') + '</a></li>')
++          .appendTo($('.sidebar .this-page-menu'));
++    }
++  },
++
++  /**
++   * init the domain index toggle buttons
++   */
++  initIndexTable : function() {
++    var togglers = $('img.toggler').click(function() {
++      var src = $(this).attr('src');
++      var idnum = $(this).attr('id').substr(7);
++      $('tr.cg-' + idnum).toggle();
++      if (src.substr(-9) == 'minus.png')
++        $(this).attr('src', src.substr(0, src.length-9) + 'plus.png');
++      else
++        $(this).attr('src', src.substr(0, src.length-8) + 'minus.png');
++    }).css('display', '');
++    if (DOCUMENTATION_OPTIONS.COLLAPSE_INDEX) {
++        togglers.click();
++    }
++  },
++
++  /**
++   * helper function to hide the search marks again
++   */
++  hideSearchWords : function() {
++    $('.sidebar .this-page-menu li.highlight-link').fadeOut(300);
++    $('span.highlighted').removeClass('highlighted');
++  },
++
++  /**
++   * make the url absolute
++   */
++  makeURL : function(relativeURL) {
++    return DOCUMENTATION_OPTIONS.URL_ROOT + '/' + relativeURL;
++  },
++
++  /**
++   * get the current relative url
++   */
++  getCurrentURL : function() {
++    var path = document.location.pathname;
++    var parts = path.split(/\//);
++    $.each(DOCUMENTATION_OPTIONS.URL_ROOT.split(/\//), function() {
++      if (this == '..')
++        parts.pop();
++    });
++    var url = parts.join('/');
++    return path.substring(url.lastIndexOf('/') + 1, path.length - 1);
++  }
++};
++
++// quick alias for translations
++_ = Documentation.gettext;
++
++$(document).ready(function() {
++  Documentation.init();
++});
+diff --git a/sphinx/themes/conjunction/static/file.png b/sphinx/themes/conjunction/static/file.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..d18082e397e7e54f20721af768c4c2983258f1b4
+GIT binary patch
+literal 392
+zc%17D@N?(olHy`uVBq!ia0vp^0wB!61|;P_|4#%`Y)RhkE)4%caKYZ?lYt_f1s;*b
+z3=G`DAk4@xYmNj^kiEpy*OmP$Hy<xMqvo~{83qPMQBN1g5R21mCvNmQ;vmqr-?K<V
+zU4kQ;TS-l(;>OL$D9)yc9|lc|nKf<9@eUiWd>3GuTC!a5vdfWYEazjncPj5ZQX%+1
+zt8B*4=d)!cdDz4wr^#OMYfqGz$1LDFF>|#>*O?<HXR=hzTfCLc!DZQEwT&GKx6RhQ
+zo))l-Eh>AGil(WEs?wLLy{Gj2J_@opDm%`dlax3yA*@*N$G&*ukFv>P8+2CBWO(qz
+zD0k1@kN>hhb1_6`&wrCswzINE(evt-5C1B^STi2@P<G<wTm_|``|B7th)+*kX+Pib
+z*M}qKJqcfCd_2yP9QQKsOSb)vO-|{xyF)I_-07lx@Zvo#rJ$WIhTj)AKCk@a+86Xn
+ktMBn$GheTj#{azILsys7Te#I72ZkAgr>mdKI;Vst0PQB6!2kdN
+
+diff --git a/sphinx/themes/conjunction/static/images/img01.jpg b/sphinx/themes/conjunction/static/images/img01.jpg
+new file mode 100644
+index 0000000000000000000000000000000000000000..bd7fa29af5c58070ec56e7de62a226f0da85bc75
+GIT binary patch
+literal 17164
+zc%1E72|Sc*+kc)}m@#OKt+bq>A<4*Eq-89XF$k%c5QPjSOL4TFNkeI6FxHAPS)zog
+z#3>{RNw%bY!BN`lRHx4I-Or3=Navi+d(QX1@Avie`?WmFecjh}{r~^#f2*&(?;b?7
+zUO-;}!6*pw0>7ZXUP#Vz!z%x92!=2a1Tny^XOOI!*SeM7kXJdl1NYs8I1n0zT;O*!
+z7L7(@u^2QOgO$J{mjq5i5?m5E99~LF3XhW(Ub4tV9K2vO1|uOMA&tXHlVqi3NeakK
+z1v%j}Inf_PIpXhJedUlG4yu9QqG34*B?qJB;JzwoKLmpdLc`GD1%oY0;P9f`V)wxV
+z2}v}Th`fNo;HA;RFTrg&6r@Uep=XA62vU>q+?H{&Lf<^NC02fN90t2YX(>-~tmDeV
+z*9sL3<-qG0jHLLIat^52jB99;V-rR}QK_#30?UHkq2-`?(2IDg<r#U^)D(z}BI>cp
+zS}1EvtI6oJjeF8G{LOj25mv5whdGdWVp%+v=8~@FJr->nYe-$I6OzVI_)vebqkerF
+zO{c;q^M}=Tyh_WCjEeU&^^S06s;0k;F`G@1-{*OQt5H+8(kP#$O$je6?x+vuMOfI@
+zQ6{!EWL=Ck%J5q@HRj3{91TNW1<{-^@jGJ{NE%<3pWSZAZp@TVh_`3s9N%%-*#tw3
+z%@K%Is1cdRZwQI@oYK%0S~PJAkr3IQ^WBYRenISv?2r}P4OEORf>p+h!^l^f8Fx)g
+zR$H^@)MREGw{puQ=2{;UhEr5(f!XafkJr1%GnM#(8ojp~VTibG4-DIr9M#Om686OE
+zM`lVyN7mMA(lFF@>ae|%FD`k3MDY!I^EStBld6Ka?hwU^Nj)ZTV98M0SGG#m``(wS
+z@ty5OT!hCwObYdiF4S*FTQC{;N$aR`H}*L;TCtoeBsUc0T=TNY@KY~OmL3s%!b6I!
+zuVafJS9zLd3=K1N(`A|yHU*{Oz%~>QZtAixZYQ>~*J*!mPgA>9s*}lyijut(R7<Fm
+zdm`}n$!Q_7^|3P+ET8IcLH8tkcWSh)iZ3Rq1h_z^`3LNFtNEL^9LLo7bg^*|N7@4?
+z#pcG6aOK_O)K;fT#HeV1;298+|9l{GsM*Vw;KE4jCRHv<t9Q%0M6W{K558jcTf+e=
+zCt6^U@@ZVswaW1^jo;Uh50dbgbbBw$dwHK!QE76vdL7OZB;8|Sq7rN%q~Y_04MzoB
+zxdIVk+}LuWBCM`Pkz=0`HT;@xiOYN(6gfRyQ;J<gv#ixMI$D#WRG4Vepw2mDnv~sp
+ziC#m9tTUSYan|}%B#l<tF`~?6hG*`Ok+06#mY664oAptgC~<FsgU+al`<pkR&0|K!
+zmPl3eWp=oB8}mq;yH-B+nPo>-_9&u=RXur>*i-$P!o=x<q)sX(DwSs?R`uH>cm@Y?
+zHNp#6@L|v3!d*mI%KeqSBJ9JCj`#3KSmuqe3_mwSuOI0n5^o#N9a;3YVxIg@ubTb!
+zYMGgaw<BbqtX_P$CZ$m@ZQIO|dAoW=$5Y9MHowm?EmOUw;9>pl_%t5r_h+F8`;DZX
+zFrO<HTYp?hI?yllSQILql4%*CYf^2M{AF?JPdjWN?RM_MpV#-Sq1bM|iGZzQ1lY`Y
+zRS422U+FyBwrX1@Kzcd+M+~Pfh$N@|PVCW2?*GDP)k0i=h1o-L#P?QHCR`|@*v9@|
+z>|li9AcTZ221}z`MPocd`qd?3WV>Z%ST+iZOB#Z-DPp2Z{{vw=BBm~_s(c5p?PqVa
+z{8Xr6FCg8si3;$A*f?4>#LmV~l_T$w1z0<`MrA&kI~v2Mu55L{l=eZ_I!q3DOHDHi
+zx6Nr;%}`YfctbUnvUyb)jTtCa4cIOe115kDrQi@fsnliP6C$C&MbslX-@q*`U50^C
+zkBTSh<EC&Tg6d7x&3GNmwgTStBXv)GjMo75Zx<?2gaXyt$2&EJD85S!H=e3_8F0}u
+z0#aq%u|}n9KLT8YXb2NY&Wkb;1=_F^+pc|C*ce=~$%(UR)%%FIc-yPZFfU^4Om=u>
+z>)&KB+ejDRgm1~aBokxBDuoc;Z8VR}v8gW#F(0NqT*t^PPx`^74&(tAn8@kxfrv_{
+z5>2Xj@;wI1{(84p!l49xAq66+vi{GqkP)XoG~%?RPc^j(I48GES^-|R|HFXPc1QD0
+zZ_=RL#L8=y!>~UqB#rJlHx9vG+mP0%HFlkQ9D=l;IoN(~dfi&8zcWMmTIbJ26I+4K
+z6hL9iXC1(3GUMy(W*VxBBOb4=$#jTQ4IbG<HiEcOn;5cUgURrTa@pSd6i<++zWb+F
+zA6@o6{u52Ss1g3Z+C=_1eet=Owi5swM_A6-9j!g3$w#Mc)!8akuaZ~nuLou=$1o>c
+zzio%GnK8)bLZ@+S`T73%mA}kB2VPE(X%2-D4NH$CI3_3iba93WH-%5ItBjkSci3!z
+zNx?uuATr{NqP5jS{sq)rv(NBbY@j_tIw%)4nV|~F{|IUnrIh#v`XgKz$_62Zwa#e7
+zQ2t9z++e19v{&c@%tj4Jw^lk3Nf{YX27}G#Hw3A3ez5_<80O4&i>T+$E6QSc?6yex
+zn1i^k%R{cqdONjPkngFzVj-CRVNQdBOdPeQ@foZIHo)pp2E=%^8gN@ER9n-72Mqk1
+z<lTa#XD6XjY%&G$c@;`KjNUCCG5iuFmb3hsmCon(PZuQJFT~5t^njk7+As@eFPNIl
+z3-C1;pL-;0dw%ICa{6T^25!Ok;IjIlgPz3^#p;i8ob1i2y2dHCL^X9Q3k}&*9}_>C
+zTSUW_ZaZGJ<I3Wa6TboKlD*hN6H-fJ22TJS(f*mdR3Uc*MK;u)?`LFFHxuv@qfQ+Z
+zi>cUYRx*y9PVaa!N};57u<b;l6^iRIFzw&s)iT5gF<r0sK@&jR^=Si5@TO#s1&UwH
+zBh9`8O!us{j^m?*7Hn7KG>2Rtml8HG15<qmj0oLoDwF0HKV_OWGL;&f28#l6G^r|%
+z>qa6n0nk>>eVxVdRAq&%_ymAW8|wOqfTp>4nF|=9-!xCiZq=7J&_(nxe^`oqFT14<
+zpgD}RA$hW3h3t-IO=&>Xf|rS{>`eQJn4U=fl^<RLoS}!f8_!K&#p-u@!1DAIlf+XD
+z^XY<s*W#xSsD(P2&r--s6wTd+A+=CNMm`nD(*So5g@b_~)8E8lj{bK8j#|_C)AlWO
+z`8>n42Tc0w<O6_?F(U(#y#}YYKG#VaXobjM%qW^TV>oI!_4T+>P_sLMhj__u(g@UW
+zH+QY}*Q;{`0vz%ju~SNkk|NZIiG>f{UJr10;G77^J3PhYZJ*T?&b3d=D@0tJ$q;$R
+zBWIPS5!9$OZ|XY#9ypV2;>LA2Gg6(R?u#sQhINZyGS9~YF;H#nfvFZBk&x+F=vpSU
+zjmGhx;}mFqoda~nZO@;C&9iLEOlhJ>ftMa}sxLBtfG$WB59(8<LcUr;tcmboq7yWv
+z`7#T^i74}sNisO$w6K9bxr>+)__YB;kbsVjgJU$tv3S=~%T8|vg!@(LTBrs~a3a89
+zW+WP)L5@KqyJ*x0T|%ZB1ufpi>^4DWL2MUt4!Lb_YwRJkrP+=GQm2Nfi!y(m{G+Dm
+zkncZW!q29s3;|WW*2?BqIXnvaOFpkDa^ykCKZ1*A=8b?&E!{Ed!&%nkDdua(H9Mfa
+z;TTMomrCw>r!aoSd!wfl$lj3fRoTR3OIkIU@R@>8eW7V$U4RY%RiaI0CS3oFK>*G-
+zBqx-OM04AbXrV$37#LyYQ2@*m$gbkyhvXa}5bj<}EygpLDvV{Ts51@<+pLa^JvkQh
+z)KPOE9}F2q;tc{Bbh$U@{Pd9}7i2$hWzgUBYXgBd5UNz-$0Ho+^nM#rR+AScWX-XY
+z1LLI94Vmdm3CH}rG<-aeiN_qAcxKkkg@&D-BZi5RV1nxdCh!nXeN6LcIv2*h1Fj4P
+z%D&zGTBU?Nki9I<c7E4<q<&G{R$w2pN^|j9qNIp?zm8;lauV>I)_)iXm=&?96<KE@
+ziWIn227!?#!0lpTQvDO;c=Za_Go({^p`D&8D&KH5rzqr`PPTIwX=}Ea5eotUnj2>z
+zG!185MF0XyckdQ59@(O4_29J{LP-m{U$3_it}(ZC6NSDuL1#!;Ee8}JB7r~tLZV1j
+zwZvpx6iP4j;IqOZP}~z9&HKw25fmOP5>%?&o^v8%h#DoeG(RUMIT@K4;*BzIE|fJ1
+z_eN+DEYAF|te<EAi?ymugbA_XgeBP3G=G*9vn5EJfP|BS^}Ajyj&veODg)tEzr1+r
+zATC`YfB9ln0|OK|7N`vAnbgt)377r==pKWO@)!t&oCuVY714lFZ3y~U#qTzl8Q$lV
+z3Qs)w3kJ$3p3^kD+J~d%q@$jB+z069ZLa}C!3LT#f>KEJ8k?A<<N719?Sv-}Emyx$
+zfnFqn1XCP+4i~{l_{F9Hbh?I6P>l?|a;EEdqYz4PG@%_F#fNtZ8FzoaOCppPqV5Mb
+z3<g3xSuG@#<%!evwImFU^8Ib6^^3$Hp*nPAZ{kY0>6*0G$7~vXS0JvHGHXx4UVkRb
+z!Gg3d%t_vEEW;id`cg&xBN*h4XLHMh%+p%4UA?YO6P)rw5)d0T6X|EMDuoLM{tv8Y
+zPslnItLOLtGBn=nRr&b|0?;LP1?$Ud$aT23s1zsrs?^)9nC2)_%M^ea>f%vD>`oMi
+z%pF9A8#!DCeQwaNS*3Yk-ln}xZfYl3Y%lP?nTK?7$*hW|*W~TmlbI^RvtZi`?0|FW
+z$BG8Z`XwU2_Bq3qYP_(p#6%KML{Snz5cl+~!Ddvn8$E49+LwF4qbEGZj3)<bs-?No
+zR-{pW@;QxCimMH@>yaTBUyPB5)xQTPDJxB<8_GK33RMQUjLpDPfE9cAaZ#8HIGLI}
+zF#xFF0Z@P1c^qw$e(nYU5Hktq1;vKE;}?b{am*xnPz00k)2f7WakQo+_*E@9Ik|Qs
+z=k2|n$nh6Pr+}gTUB@N_gf3TI5VRYcO8j`X96%#saUMVhPQTI!;qTbEO+rm#avrZo
+zMdpU+*VjWt7|)=Y>5`TSwJ*{(HtQengpRA&%$*#L{LsLh^Z>}i{-?9wBFEeAyaoX9
+z2@|)w-}V5by*8%}Om@sTPnE`I>s`Z>aH+2|=s!+j%IWSx1yY<bzfPP*>kzj3n!D0j
+zb7OzaI*1%EzmNnq`%fcwuefk8c!dl;4uuPh{{E+Pfbe`(5~Ft_#;fG7hG;8pIvhp0
+z^DJ8<O_!H3>j0GDm)7rff%UY(Bs@UuPsU=eaic*t2&me^pAT*nnxD4S3=gWTY{iLy
+z0x(d$ot{WC>La8J_WFV$_oqUz{yy>0YWN&a4nb4}wpATBDu&<co{6>BDYIwqU@GO*
+z*Xi9C(dP`MAZ9_1a4SAT$)0<)x4)jH>n?WZMdW=c)l)}kEPm*?-B*`@!ACXUFbg(s
+z1>~HqDx|+MhDQQ=iU2};D9^Av4(TG^EL;1&>}|}Fh=z^zqpC}buZ-dG3wq&?bHHTC
+zw#%YvGP4Y{FL8wKG2$M#(o7{2VI@C#2nru-4H5C;(*2&ES3X!M^+ncq?1jPL@tHnn
+z37Dh;e9KQ*f>W1w(hH8TN3JAitI1A6X)GF|{N3;cY=n<=s@v%YuiMO)eo3{KJER*n
+zl}cai&OIuQfJvg!Nr+(JF@6Xa7x0FDu3`FIvk{>pUH#apPwpFQw7%GVKSPO>Wu8f8
+zZ=J+>xT;b_l0dpAd9NcPh)wlFQnIB}MWly<(7U^@x?r8ZM3A)$*v;0x2FeF>hf(l*
+z(KOb<Yg6QM5kXgR8B&qwWk+ZtJwJZ)W%v{Fu`g>#qYBF{YUS(J#o{`+Uv&1sR;Y6#
+zjObXY)X5C}K`B4*F5Xwfi`JW4r_b?H^e8%51WccAV5rQd4TwR~%5t6sjF`7T1#LU6
+zpx%9B?!Ykm2KE13sAE-^Sm%D|W&BdB%+ia0X*>fRmU+gx5^Soa(=5>CWp6rJlar{j
+zY2C%H57T*|ZbW5Y)AwcmXzf8J$j~6e<8^vLCD!4>qD^<px%Ez1v%>^F)xw*O?a@)v
+z1vv>!>|K>MZ_>m`sj62W1Q<QX=ma3L#CFL3HeIE>Zm?Epdq`$lVZCdB<3T!tAi{OO
+zusK2iWk>Wd>~A=lZDd65LH;k^&Pf@2Xi_Z-wUZu{1qi#2`(brnLo6J+{rv9g0{!v<
+z;6N=9+Pb$$d3<~pS4gL~9S5!o+2lt)>)0~GDaM_9f0YywCM-_CR;<2M$YviVxw1e@
+zQy-mkd18=Bb4!2z;ANh4!2pZcMiA6gs(rD#bLt~u!G8?R3b`Y!_fDO7flLBL`CB2s
+z74pBUkSx~Iap5_K(XEWjE_aUo`V6+DB!?c@z4txH;R;61p`v4g5xX1-c%88)LV^R~
+zLznN~+YYL1YlEHd^1`Ij6K9E^#;3Y1q2O|Kp4e0pbC)iY{^1pyqsfWWX+9Zr{yXir
+z$?5FudrxIm$~_S2_2*Zcq0J#oDfMD??`&?1#!=May!R9C>vGgE2~E7?xm=7>;)bK1
+zxFyr3Ma}y_GgmODC$iel+}#iM+(>f@4Ba8)p^Nlh(DabJEdxTi@g6)3odo){7<O2?
+zSvD}qTn=U3!&tV2j?!YBZPw*zB_v$<?o+y|lq#jJxYu>vrMfvjzGN+9Q;VpAvB)H2
+z_5{Vy8riT;T~JWz7>WR&!_Gc7SJK!<6}L@&J^xs4<~Bw3+pHvWMeEx8`+u`1MiRN+
+z9icii9|HIo5)~&*%(&nzji4ug{h1oFFAYlcK6B>w4$$eAa;GJS&}kY(4vl-(v9;Ba
+zwu}3$xL#F??;Uul57NY$@1*NLHB}z}^3_$B6r9vP*~a^M5<+Ki*42w>NQM}Nw_F1*
+zT&9})d1z@}-PRzFGbhvCruse3A<w6WF@1=Uj)iAd^+E9%)nV<!E|l~QY(ql`0^M}<
+zaVkVe{YHS!OizFoBV9$s)#crIjw+FIJYKNDDMl@`G~WPcp5x-G*9X<2h=)lwrFIvq
+zKW#2*^NBzm*<Nhy53`Z^b3AbzMg|9wdQU5lFL=eUPf3#6Rdg?eQ%T%OT4v2Wn`<TK
+z=+>6ZQFY2YKDH0)gmDgd4Y#b754X+*FgAm~f$A@TN?k49cHiO%{w<t0J0(dbL(*ag
+z(PQF_C$4g+{<Nv=stU}xE!}~x+l;ki9CQ*loW2{qJc!Ju_t$?$)jjeq&P3S>X6*Gh
+z^Mf3|efaIef9HoOc`rki)qE`<RQ6OX0Z$47D7PaE#wJN6UM+iOi4V|3x#>LFXnk`R
+zN_;sj;(Ft7m3dFkHp+eb=G!-a>o<YcFK#Wi?h!O9PCr=GNWF|9_4uu$pQgYllFdou
+zxUDlD5i#VSCV%Q^W|L{yc4>MkAvg)OV$SOH<y<I{v3R3x2^j}eJi03N<!LfoRnqLc
+zuC_E71?iNpv~6D=Urze)WDe?94CX8|wQ22Th{lQ2wxitLTY`acvv7UTjN*GZA{>e)
+z1ytTT3MF23`AO*!TfM2}PF#Q$3PVX=8Km)PZ4DV`*0}J4APb_g2?b;0LX|poG3Pd3
+zrGb6w@Q%Jo4W<#nOp=eD`7po?GM9~*cO~B#g@N4IRjCE1r?S;ww{66hkn!sUGc#{;
+zp>22#=QR5H@xeG0alPDcYgy$)GOAYsl%~W67L@^F@N<6D0NcjV^{XD(zP}kmBW_RM
+z|JvUU+6F0m=xOv)Yd!Fr-yYlsw&_N-?V0h2O*W_VrjXWE-->`Z6EQ!eG6OL<s1%N#
+z=^3yXVsz)dAq3O@TdV7S=IzPlZvnR2Wx=QT%)FDcf~rwhMAft8da|3Nh|2qg%R7I2
+z<KO*8LvKLV;ae|c*VrWyj2aiJ=Nsd%u$$pEi$F_J<?BI1?Y=$w`bRskS@7|#{>(s9
+zIg5Qt1NI=RM>oUaAM#n{4EQLjJqgQZ^QPEfySoHgu(m`JVWo!>3gvu2SNTv%TN<W7
+z#e*8ncE;gXt}l204_(HUtc12fRh4UFP*pwbkk>TuAr^TJ8{G_bcd?yibP4iM0g)ho
+z6ux=|0*fdik(H*{pbw?M9){)GHmGu%wq26sJVO*%&>7hUh$*|(7t3yjPU;e1=;SPq
+z37;AX@KG4q5e(v+d`SP-!(JAx&R*_>suZmZoyx{?M61GU?Fl&HiWpQ!x)M>i8V)O<
+zX_JL35ea^5XPR*HWTjT9K(uihH5c~$>SYPq*aD*Yr6^>lV4bNR<jDQf$UebJj^$>A
+zNn?@XfVKGS2&LIbX+YK$3>c&RJyIC3UIY(?bAEx81+0kG#t={5M~VWrD&>q*U3CE|
+z3D~T{Uk;;WH70T1>UkQUOmDj%=_s>dZGFC#*L^JO(<T2aTXlQHAI)j|m3nn?m#Mq|
+z%N_KOCLd<rzw`L*q}B(X&))R}Y&@jb@p{FcS&MF5y?kEw-LmYTPsoqiaGnv;@?qcg
+zluw>bTN}38z7IS5<3hprNt^P2S$;69KD6xmL)o~WLtd@B@MG)aImfCl+<xA4>+RfC
+zg0Ayp*B>f66t{Kavl9+a-8CjX0h`KsJ@JIm`wN-BrhQ6%@qEL^{eCZX-)(wxdd{Mx
+zr{O26Cr;_@esp)oreiIemPPM4dzWAGc=JD+#E)M}V%<NU#GNlCarz%m;`x`7SpJVE
+z5%$$^`rDEy{c1S<eMx*ZC;q-9z7hNXC9(NG85+>`ZaE!qKx5lqLBSS=IIMIdS>gZc
+zKhgGJYJ<s6BNM;<<)8VB<l`|lr3r8L^=`>3{Y_%-l(>>*S<+)-!>092Z2!0@?348D
+z1GQ<obLZbWkr}q?>72VSbYF#O1(ttM4n7xqdw=n}AIdLWzLj$U{m8BMmxZBon{W3)
+X=rL1*zpe3Yjc;rGpIoD&@5cWCNhqk4
+
+diff --git a/sphinx/themes/conjunction/static/images/img02.jpg b/sphinx/themes/conjunction/static/images/img02.jpg
+new file mode 100644
+index 0000000000000000000000000000000000000000..55068e4f934c19f20bac1b24badfedcd7c1f30eb
+GIT binary patch
+literal 716
+zc%1ux<NpH&0WUXCHwH!~28I+MWcdGvLC~c%IlGd9k%5JQfx#On^p1hgF(p4Kl_BK-
+zP=xXSZH5*GW+o5-lFY2k%*?E;EX>R-tZb|xz{bJG4g_o*9GqNST$~&{V890g0&u{{
+z%)-LP#>T_J!6U@S!zUyH5)=^x%Lzg#0YL#g;Qs*zK@Nsmh9YK0K?Wv4MrJ|A|3?^N
+zfX-%SKmkmw9E^;N3}}J^KoJ&pWFf{tCZQ{=Y}3TUIRr5b0m}Wq#lXYN2(*e>kinke
+zM9lLS|E^x$-EVS4S+wD~z5BOyYwuJpQ#hJndH&+x)vL?pGCK?-_=>;OXT7?6d{z=q
+p81tOJ^0#(vFMKwmc_1~2h6QTq=qw6gI;F}$JmtYKm_hyjn*a;5nHc~8
+
+diff --git a/sphinx/themes/conjunction/static/images/img03.jpg b/sphinx/themes/conjunction/static/images/img03.jpg
+new file mode 100644
+index 0000000000000000000000000000000000000000..8a10e7f21beffbfb9b9b23b8b49731d7f1a1ac92
+GIT binary patch
+literal 1942
+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
+
+diff --git a/sphinx/themes/conjunction/static/images/img04.jpg b/sphinx/themes/conjunction/static/images/img04.jpg
+new file mode 100644
+index 0000000000000000000000000000000000000000..86e20ac71f9b6136a9080ccd7f4cd21f66c42a8b
+GIT binary patch
+literal 5590
+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
+U9r-8BfwnVpO8*{*gQ-*h14_qwPyhe`
+
+diff --git a/sphinx/themes/conjunction/static/images/img06.jpg b/sphinx/themes/conjunction/static/images/img06.jpg
+new file mode 100644
+index 0000000000000000000000000000000000000000..a8e4f9783c63ed8696dfef19fe657dfcbea50b78
+GIT binary patch
+literal 314
+zc$|ICv1&pw6vpu{IZ4dDgqR~PK88c*DipzXaO_ej=yh^%a&UL<+jMvE5gfE#`T(V`
+z5Kj~YTj(#41OJ>M`H;Vm9!KL5lm;3($lu_H)oihbf&uU(=?8JxET?lcTPZ4kVgu5J
+z++>N!T0>;4vxW1nC7kzFUDuTlXR%0Eii~m21@A*AhS=$r*yZyZUq<5ekGutY`J^Mo
+t(5#46-eDr;R;7LyBxt&c#^P@E&VLs32ZC&BCdNGm&->onYyYL4k0-_8BoF`q
+
+diff --git a/sphinx/themes/conjunction/static/images/img07.jpg b/sphinx/themes/conjunction/static/images/img07.jpg
+new file mode 100644
+index 0000000000000000000000000000000000000000..a28dc585fbca97c3f54ce27b4a9df5f659b62503
+GIT binary patch
+literal 387
+zc%1ux<NpH&0WUXCHwH!~28I+MWcdGvLC~c%IlGd9k%5JQfx#On^p1hgF(p4Kl_BK-
+zP=xXSZH5*GW+o5-lFY2k%*?E;EX>R-tZb|xz{bJG4g_o*9GqNST$~&{V890g0&u{{
+z%)-LP#>T_J!6U@S!zUyH5)=^x%Lzg#0YL#g;Qs*zK@J9X26kpfK?Wv4MrJ|A|3?^N
+zfX+q*oQ&uqtO5*Rw<AQDm>F3Fg_PKYMOcAm0eMJT7!?JX43(Gzo&Miq;9+J2TE#5L
+zV9($g8@<(d;}We}slZIl=6x3zJdlr^=jb8hyYpUZQ;@`wHts38tA)iLSxT;K3OlS-
+d7j%B5=1R7`=M%-&G<>xvwBFt?EiCr`CIH=VKSBTi
+
+diff --git a/sphinx/themes/conjunction/static/jquery.js b/sphinx/themes/conjunction/static/jquery.js
+new file mode 100644
+--- /dev/null
++++ b/sphinx/themes/conjunction/static/jquery.js
+@@ -0,0 +1,151 @@
++/*!
++ * jQuery JavaScript Library v1.4
++ * http://jquery.com/
++ *
++ * Copyright 2010, John Resig
++ * Dual licensed under the MIT or GPL Version 2 licenses.
++ * http://docs.jquery.com/License
++ *
++ * Includes Sizzle.js
++ * http://sizzlejs.com/
++ * Copyright 2010, The Dojo Foundation
++ * Released under the MIT, BSD, and GPL Licenses.
++ *
++ * Date: Wed Jan 13 15:23:05 2010 -0500
++ */
++(function(A,w){function oa(){if(!c.isReady){try{s.documentElement.doScroll("left")}catch(a){setTimeout(oa,1);return}c.ready()}}function La(a,b){b.src?c.ajax({url:b.src,async:false,dataType:"script"}):c.globalEval(b.text||b.textContent||b.innerHTML||"");b.parentNode&&b.parentNode.removeChild(b)}function $(a,b,d,f,e,i){var j=a.length;if(typeof b==="object"){for(var o in b)$(a,o,b[o],f,e,d);return a}if(d!==w){f=!i&&f&&c.isFunction(d);for(o=0;o<j;o++)e(a[o],b,f?d.call(a[o],o,e(a[o],b)):d,i);return a}return j?
++e(a[0],b):null}function K(){return(new Date).getTime()}function aa(){return false}function ba(){return true}function pa(a,b,d){d[0].type=a;return c.event.handle.apply(b,d)}function qa(a){var b=true,d=[],f=[],e=arguments,i,j,o,p,n,t=c.extend({},c.data(this,"events").live);for(p in t){j=t[p];if(j.live===a.type||j.altLive&&c.inArray(a.type,j.altLive)>-1){i=j.data;i.beforeFilter&&i.beforeFilter[a.type]&&!i.beforeFilter[a.type](a)||f.push(j.selector)}else delete t[p]}i=c(a.target).closest(f,a.currentTarget);
++n=0;for(l=i.length;n<l;n++)for(p in t){j=t[p];o=i[n].elem;f=null;if(i[n].selector===j.selector){if(j.live==="mouseenter"||j.live==="mouseleave")f=c(a.relatedTarget).closest(j.selector)[0];if(!f||f!==o)d.push({elem:o,fn:j})}}n=0;for(l=d.length;n<l;n++){i=d[n];a.currentTarget=i.elem;a.data=i.fn.data;if(i.fn.apply(i.elem,e)===false){b=false;break}}return b}function ra(a,b){return["live",a,b.replace(/\./g,"`").replace(/ /g,"&")].join(".")}function sa(a){return!a||!a.parentNode||a.parentNode.nodeType===
++11}function ta(a,b){var d=0;b.each(function(){if(this.nodeName===(a[d]&&a[d].nodeName)){var f=c.data(a[d++]),e=c.data(this,f);if(f=f&&f.events){delete e.handle;e.events={};for(var i in f)for(var j in f[i])c.event.add(this,i,f[i][j],f[i][j].data)}}})}function ua(a,b,d){var f,e,i;if(a.length===1&&typeof a[0]==="string"&&a[0].length<512&&a[0].indexOf("<option")<0){e=true;if(i=c.fragments[a[0]])if(i!==1)f=i}if(!f){b=b&&b[0]?b[0].ownerDocument||b[0]:s;f=b.createDocumentFragment();c.clean(a,b,f,d)}if(e)c.fragments[a[0]]=
++i?f:1;return{fragment:f,cacheable:e}}function T(a){for(var b=0,d,f;(d=a[b])!=null;b++)if(!c.noData[d.nodeName.toLowerCase()]&&(f=d[H]))delete c.cache[f]}function L(a,b){var d={};c.each(va.concat.apply([],va.slice(0,b)),function(){d[this]=a});return d}function wa(a){return"scrollTo"in a&&a.document?a:a.nodeType===9?a.defaultView||a.parentWindow:false}var c=function(a,b){return new c.fn.init(a,b)},Ma=A.jQuery,Na=A.$,s=A.document,U,Oa=/^[^<]*(<[\w\W]+>)[^>]*$|^#([\w-]+)$/,Pa=/^.[^:#\[\.,]*$/,Qa=/\S/,
++Ra=/^(\s|\u00A0)+|(\s|\u00A0)+$/g,Sa=/^<(\w+)\s*\/?>(?:<\/\1>)?$/,P=navigator.userAgent,xa=false,Q=[],M,ca=Object.prototype.toString,da=Object.prototype.hasOwnProperty,ea=Array.prototype.push,R=Array.prototype.slice,V=Array.prototype.indexOf;c.fn=c.prototype={init:function(a,b){var d,f;if(!a)return this;if(a.nodeType){this.context=this[0]=a;this.length=1;return this}if(typeof a==="string")if((d=Oa.exec(a))&&(d[1]||!b))if(d[1]){f=b?b.ownerDocument||b:s;if(a=Sa.exec(a))if(c.isPlainObject(b)){a=[s.createElement(a[1])];
++c.fn.attr.call(a,b,true)}else a=[f.createElement(a[1])];else{a=ua([d[1]],[f]);a=(a.cacheable?a.fragment.cloneNode(true):a.fragment).childNodes}}else{if(b=s.getElementById(d[2])){if(b.id!==d[2])return U.find(a);this.length=1;this[0]=b}this.context=s;this.selector=a;return this}else if(!b&&/^\w+$/.test(a)){this.selector=a;this.context=s;a=s.getElementsByTagName(a)}else return!b||b.jquery?(b||U).find(a):c(b).find(a);else if(c.isFunction(a))return U.ready(a);if(a.selector!==w){this.selector=a.selector;
++this.context=a.context}return c.isArray(a)?this.setArray(a):c.makeArray(a,this)},selector:"",jquery:"1.4",length:0,size:function(){return this.length},toArray:function(){return R.call(this,0)},get:function(a){return a==null?this.toArray():a<0?this.slice(a)[0]:this[a]},pushStack:function(a,b,d){a=c(a||null);a.prevObject=this;a.context=this.context;if(b==="find")a.selector=this.selector+(this.selector?" ":"")+d;else if(b)a.selector=this.selector+"."+b+"("+d+")";return a},setArray:function(a){this.length=
++0;ea.apply(this,a);return this},each:function(a,b){return c.each(this,a,b)},ready:function(a){c.bindReady();if(c.isReady)a.call(s,c);else Q&&Q.push(a);return this},eq:function(a){return a===-1?this.slice(a):this.slice(a,+a+1)},first:function(){return this.eq(0)},last:function(){return this.eq(-1)},slice:function(){return this.pushStack(R.apply(this,arguments),"slice",R.call(arguments).join(","))},map:function(a){return this.pushStack(c.map(this,function(b,d){return a.call(b,d,b)}))},end:function(){return this.prevObject||
++c(null)},push:ea,sort:[].sort,splice:[].splice};c.fn.init.prototype=c.fn;c.extend=c.fn.extend=function(){var a=arguments[0]||{},b=1,d=arguments.length,f=false,e,i,j,o;if(typeof a==="boolean"){f=a;a=arguments[1]||{};b=2}if(typeof a!=="object"&&!c.isFunction(a))a={};if(d===b){a=this;--b}for(;b<d;b++)if((e=arguments[b])!=null)for(i in e){j=a[i];o=e[i];if(a!==o)if(f&&o&&(c.isPlainObject(o)||c.isArray(o))){j=j&&(c.isPlainObject(j)||c.isArray(j))?j:c.isArray(o)?[]:{};a[i]=c.extend(f,j,o)}else if(o!==w)a[i]=
++o}return a};c.extend({noConflict:function(a){A.$=Na;if(a)A.jQuery=Ma;return c},isReady:false,ready:function(){if(!c.isReady){if(!s.body)return setTimeout(c.ready,13);c.isReady=true;if(Q){for(var a,b=0;a=Q[b++];)a.call(s,c);Q=null}c.fn.triggerHandler&&c(s).triggerHandler("ready")}},bindReady:function(){if(!xa){xa=true;if(s.readyState==="complete")return c.ready();if(s.addEventListener){s.addEventListener("DOMContentLoaded",M,false);A.addEventListener("load",c.ready,false)}else if(s.attachEvent){s.attachEvent("onreadystatechange",
++M);A.attachEvent("onload",c.ready);var a=false;try{a=A.frameElement==null}catch(b){}s.documentElement.doScroll&&a&&oa()}}},isFunction:function(a){return ca.call(a)==="[object Function]"},isArray:function(a){return ca.call(a)==="[object Array]"},isPlainObject:function(a){if(!a||ca.call(a)!=="[object Object]"||a.nodeType||a.setInterval)return false;if(a.constructor&&!da.call(a,"constructor")&&!da.call(a.constructor.prototype,"isPrototypeOf"))return false;var b;for(b in a);return b===w||da.call(a,b)},
++isEmptyObject:function(a){for(var b in a)return false;return true},noop:function(){},globalEval:function(a){if(a&&Qa.test(a)){var b=s.getElementsByTagName("head")[0]||s.documentElement,d=s.createElement("script");d.type="text/javascript";if(c.support.scriptEval)d.appendChild(s.createTextNode(a));else d.text=a;b.insertBefore(d,b.firstChild);b.removeChild(d)}},nodeName:function(a,b){return a.nodeName&&a.nodeName.toUpperCase()===b.toUpperCase()},each:function(a,b,d){var f,e=0,i=a.length,j=i===w||c.isFunction(a);
++if(d)if(j)for(f in a){if(b.apply(a[f],d)===false)break}else for(;e<i;){if(b.apply(a[e++],d)===false)break}else if(j)for(f in a){if(b.call(a[f],f,a[f])===false)break}else for(d=a[0];e<i&&b.call(d,e,d)!==false;d=a[++e]);return a},trim:function(a){return(a||"").replace(Ra,"")},makeArray:function(a,b){b=b||[];if(a!=null)a.length==null||typeof a==="string"||c.isFunction(a)||typeof a!=="function"&&a.setInterval?ea.call(b,a):c.merge(b,a);return b},inArray:function(a,b){if(b.indexOf)return b.indexOf(a);for(var d=
++0,f=b.length;d<f;d++)if(b[d]===a)return d;return-1},merge:function(a,b){var d=a.length,f=0;if(typeof b.length==="number")for(var e=b.length;f<e;f++)a[d++]=b[f];else for(;b[f]!==w;)a[d++]=b[f++];a.length=d;return a},grep:function(a,b,d){for(var f=[],e=0,i=a.length;e<i;e++)!d!==!b(a[e],e)&&f.push(a[e]);return f},map:function(a,b,d){for(var f=[],e,i=0,j=a.length;i<j;i++){e=b(a[i],i,d);if(e!=null)f[f.length]=e}return f.concat.apply([],f)},guid:1,proxy:function(a,b,d){if(arguments.length===2)if(typeof b===
++"string"){d=a;a=d[b];b=w}else if(b&&!c.isFunction(b)){d=b;b=w}if(!b&&a)b=function(){return a.apply(d||this,arguments)};if(a)b.guid=a.guid=a.guid||b.guid||c.guid++;return b},uaMatch:function(a){var b={browser:""};a=a.toLowerCase();if(/webkit/.test(a))b={browser:"webkit",version:/webkit[\/ ]([\w.]+)/};else if(/opera/.test(a))b={browser:"opera",version:/version/.test(a)?/version[\/ ]([\w.]+)/:/opera[\/ ]([\w.]+)/};else if(/msie/.test(a))b={browser:"msie",version:/msie ([\w.]+)/};else if(/mozilla/.test(a)&&
++!/compatible/.test(a))b={browser:"mozilla",version:/rv:([\w.]+)/};b.version=(b.version&&b.version.exec(a)||[0,"0"])[1];return b},browser:{}});P=c.uaMatch(P);if(P.browser){c.browser[P.browser]=true;c.browser.version=P.version}if(c.browser.webkit)c.browser.safari=true;if(V)c.inArray=function(a,b){return V.call(b,a)};U=c(s);if(s.addEventListener)M=function(){s.removeEventListener("DOMContentLoaded",M,false);c.ready()};else if(s.attachEvent)M=function(){if(s.readyState==="complete"){s.detachEvent("onreadystatechange",
++M);c.ready()}};if(V)c.inArray=function(a,b){return V.call(b,a)};(function(){c.support={};var a=s.documentElement,b=s.createElement("script"),d=s.createElement("div"),f="script"+K();d.style.display="none";d.innerHTML="   <link/><table></table><a href='/a' style='color:red;float:left;opacity:.55;'>a</a><input type='checkbox'/>";var e=d.getElementsByTagName("*"),i=d.getElementsByTagName("a")[0];if(!(!e||!e.length||!i)){c.support={leadingWhitespace:d.firstChild.nodeType===3,tbody:!d.getElementsByTagName("tbody").length,
++htmlSerialize:!!d.getElementsByTagName("link").length,style:/red/.test(i.getAttribute("style")),hrefNormalized:i.getAttribute("href")==="/a",opacity:/^0.55$/.test(i.style.opacity),cssFloat:!!i.style.cssFloat,checkOn:d.getElementsByTagName("input")[0].value==="on",optSelected:s.createElement("select").appendChild(s.createElement("option")).selected,scriptEval:false,noCloneEvent:true,boxModel:null};b.type="text/javascript";try{b.appendChild(s.createTextNode("window."+f+"=1;"))}catch(j){}a.insertBefore(b,
++a.firstChild);if(A[f]){c.support.scriptEval=true;delete A[f]}a.removeChild(b);if(d.attachEvent&&d.fireEvent){d.attachEvent("onclick",function o(){c.support.noCloneEvent=false;d.detachEvent("onclick",o)});d.cloneNode(true).fireEvent("onclick")}c(function(){var o=s.createElement("div");o.style.width=o.style.paddingLeft="1px";s.body.appendChild(o);c.boxModel=c.support.boxModel=o.offsetWidth===2;s.body.removeChild(o).style.display="none"});a=function(o){var p=s.createElement("div");o="on"+o;var n=o in
++p;if(!n){p.setAttribute(o,"return;");n=typeof p[o]==="function"}return n};c.support.submitBubbles=a("submit");c.support.changeBubbles=a("change");a=b=d=e=i=null}})();c.props={"for":"htmlFor","class":"className",readonly:"readOnly",maxlength:"maxLength",cellspacing:"cellSpacing",rowspan:"rowSpan",colspan:"colSpan",tabindex:"tabIndex",usemap:"useMap",frameborder:"frameBorder"};var H="jQuery"+K(),Ta=0,ya={},Ua={};c.extend({cache:{},expando:H,noData:{embed:true,object:true,applet:true},data:function(a,
++b,d){if(!(a.nodeName&&c.noData[a.nodeName.toLowerCase()])){a=a==A?ya:a;var f=a[H],e=c.cache;if(!b&&!f)return null;f||(f=++Ta);if(typeof b==="object"){a[H]=f;e=e[f]=c.extend(true,{},b)}else e=e[f]?e[f]:typeof d==="undefined"?Ua:(e[f]={});if(d!==w){a[H]=f;e[b]=d}return typeof b==="string"?e[b]:e}},removeData:function(a,b){if(!(a.nodeName&&c.noData[a.nodeName.toLowerCase()])){a=a==A?ya:a;var d=a[H],f=c.cache,e=f[d];if(b){if(e){delete e[b];c.isEmptyObject(e)&&c.removeData(a)}}else{try{delete a[H]}catch(i){a.removeAttribute&&
++a.removeAttribute(H)}delete f[d]}}}});c.fn.extend({data:function(a,b){if(typeof a==="undefined"&&this.length)return c.data(this[0]);else if(typeof a==="object")return this.each(function(){c.data(this,a)});var d=a.split(".");d[1]=d[1]?"."+d[1]:"";if(b===w){var f=this.triggerHandler("getData"+d[1]+"!",[d[0]]);if(f===w&&this.length)f=c.data(this[0],a);return f===w&&d[1]?this.data(d[0]):f}else return this.trigger("setData"+d[1]+"!",[d[0],b]).each(function(){c.data(this,a,b)})},removeData:function(a){return this.each(function(){c.removeData(this,
++a)})}});c.extend({queue:function(a,b,d){if(a){b=(b||"fx")+"queue";var f=c.data(a,b);if(!d)return f||[];if(!f||c.isArray(d))f=c.data(a,b,c.makeArray(d));else f.push(d);return f}},dequeue:function(a,b){b=b||"fx";var d=c.queue(a,b),f=d.shift();if(f==="inprogress")f=d.shift();if(f){b==="fx"&&d.unshift("inprogress");f.call(a,function(){c.dequeue(a,b)})}}});c.fn.extend({queue:function(a,b){if(typeof a!=="string"){b=a;a="fx"}if(b===w)return c.queue(this[0],a);return this.each(function(){var d=c.queue(this,
++a,b);a==="fx"&&d[0]!=="inprogress"&&c.dequeue(this,a)})},dequeue:function(a){return this.each(function(){c.dequeue(this,a)})},delay:function(a,b){a=c.fx?c.fx.speeds[a]||a:a;b=b||"fx";return this.queue(b,function(){var d=this;setTimeout(function(){c.dequeue(d,b)},a)})},clearQueue:function(a){return this.queue(a||"fx",[])}});var za=/[\n\t]/g,fa=/\s+/,Va=/\r/g,Wa=/href|src|style/,Xa=/(button|input)/i,Ya=/(button|input|object|select|textarea)/i,Za=/^(a|area)$/i,Aa=/radio|checkbox/;c.fn.extend({attr:function(a,
++b){return $(this,a,b,true,c.attr)},removeAttr:function(a){return this.each(function(){c.attr(this,a,"");this.nodeType===1&&this.removeAttribute(a)})},addClass:function(a){if(c.isFunction(a))return this.each(function(p){var n=c(this);n.addClass(a.call(this,p,n.attr("class")))});if(a&&typeof a==="string")for(var b=(a||"").split(fa),d=0,f=this.length;d<f;d++){var e=this[d];if(e.nodeType===1)if(e.className)for(var i=" "+e.className+" ",j=0,o=b.length;j<o;j++){if(i.indexOf(" "+b[j]+" ")<0)e.className+=
++" "+b[j]}else e.className=a}return this},removeClass:function(a){if(c.isFunction(a))return this.each(function(p){var n=c(this);n.removeClass(a.call(this,p,n.attr("class")))});if(a&&typeof a==="string"||a===w)for(var b=(a||"").split(fa),d=0,f=this.length;d<f;d++){var e=this[d];if(e.nodeType===1&&e.className)if(a){for(var i=(" "+e.className+" ").replace(za," "),j=0,o=b.length;j<o;j++)i=i.replace(" "+b[j]+" "," ");e.className=i.substring(1,i.length-1)}else e.className=""}return this},toggleClass:function(a,
++b){var d=typeof a,f=typeof b==="boolean";if(c.isFunction(a))return this.each(function(e){var i=c(this);i.toggleClass(a.call(this,e,i.attr("class"),b),b)});return this.each(function(){if(d==="string")for(var e,i=0,j=c(this),o=b,p=a.split(fa);e=p[i++];){o=f?o:!j.hasClass(e);j[o?"addClass":"removeClass"](e)}else if(d==="undefined"||d==="boolean"){this.className&&c.data(this,"__className__",this.className);this.className=this.className||a===false?"":c.data(this,"__className__")||""}})},hasClass:function(a){a=
++" "+a+" ";for(var b=0,d=this.length;b<d;b++)if((" "+this[b].className+" ").replace(za," ").indexOf(a)>-1)return true;return false},val:function(a){if(a===w){var b=this[0];if(b){if(c.nodeName(b,"option"))return(b.attributes.value||{}).specified?b.value:b.text;if(c.nodeName(b,"select")){var d=b.selectedIndex,f=[],e=b.options;b=b.type==="select-one";if(d<0)return null;var i=b?d:0;for(d=b?d+1:e.length;i<d;i++){var j=e[i];if(j.selected){a=c(j).val();if(b)return a;f.push(a)}}return f}if(Aa.test(b.type)&&
++!c.support.checkOn)return b.getAttribute("value")===null?"on":b.value;return(b.value||"").replace(Va,"")}return w}var o=c.isFunction(a);return this.each(function(p){var n=c(this),t=a;if(this.nodeType===1){if(o)t=a.call(this,p,n.val());if(typeof t==="number")t+="";if(c.isArray(t)&&Aa.test(this.type))this.checked=c.inArray(n.val(),t)>=0;else if(c.nodeName(this,"select")){var z=c.makeArray(t);c("option",this).each(function(){this.selected=c.inArray(c(this).val(),z)>=0});if(!z.length)this.selectedIndex=
++-1}else this.value=t}})}});c.extend({attrFn:{val:true,css:true,html:true,text:true,data:true,width:true,height:true,offset:true},attr:function(a,b,d,f){if(!a||a.nodeType===3||a.nodeType===8)return w;if(f&&b in c.attrFn)return c(a)[b](d);f=a.nodeType!==1||!c.isXMLDoc(a);var e=d!==w;b=f&&c.props[b]||b;if(a.nodeType===1){var i=Wa.test(b);if(b in a&&f&&!i){if(e){if(b==="type"&&Xa.test(a.nodeName)&&a.parentNode)throw"type property can't be changed";a[b]=d}if(c.nodeName(a,"form")&&a.getAttributeNode(b))return a.getAttributeNode(b).nodeValue;
++if(b==="tabIndex")return(b=a.getAttributeNode("tabIndex"))&&b.specified?b.value:Ya.test(a.nodeName)||Za.test(a.nodeName)&&a.href?0:w;return a[b]}if(!c.support.style&&f&&b==="style"){if(e)a.style.cssText=""+d;return a.style.cssText}e&&a.setAttribute(b,""+d);a=!c.support.hrefNormalized&&f&&i?a.getAttribute(b,2):a.getAttribute(b);return a===null?w:a}return c.style(a,b,d)}});var $a=function(a){return a.replace(/[^\w\s\.\|`]/g,function(b){return"\\"+b})};c.event={add:function(a,b,d,f){if(!(a.nodeType===
++3||a.nodeType===8)){if(a.setInterval&&a!==A&&!a.frameElement)a=A;if(!d.guid)d.guid=c.guid++;if(f!==w){d=c.proxy(d);d.data=f}var e=c.data(a,"events")||c.data(a,"events",{}),i=c.data(a,"handle"),j;if(!i){j=function(){return typeof c!=="undefined"&&!c.event.triggered?c.event.handle.apply(j.elem,arguments):w};i=c.data(a,"handle",j)}if(i){i.elem=a;b=b.split(/\s+/);for(var o,p=0;o=b[p++];){var n=o.split(".");o=n.shift();d.type=n.slice(0).sort().join(".");var t=e[o],z=this.special[o]||{};if(!t){t=e[o]={};
++if(!z.setup||z.setup.call(a,f,n,d)===false)if(a.addEventListener)a.addEventListener(o,i,false);else a.attachEvent&&a.attachEvent("on"+o,i)}if(z.add)if((n=z.add.call(a,d,f,n,t))&&c.isFunction(n)){n.guid=n.guid||d.guid;d=n}t[d.guid]=d;this.global[o]=true}a=null}}},global:{},remove:function(a,b,d){if(!(a.nodeType===3||a.nodeType===8)){var f=c.data(a,"events"),e,i,j;if(f){if(b===w||typeof b==="string"&&b.charAt(0)===".")for(i in f)this.remove(a,i+(b||""));else{if(b.type){d=b.handler;b=b.type}b=b.split(/\s+/);
++for(var o=0;i=b[o++];){var p=i.split(".");i=p.shift();var n=!p.length,t=c.map(p.slice(0).sort(),$a);t=new RegExp("(^|\\.)"+t.join("\\.(?:.*\\.)?")+"(\\.|$)");var z=this.special[i]||{};if(f[i]){if(d){j=f[i][d.guid];delete f[i][d.guid]}else for(var B in f[i])if(n||t.test(f[i][B].type))delete f[i][B];z.remove&&z.remove.call(a,p,j);for(e in f[i])break;if(!e){if(!z.teardown||z.teardown.call(a,p)===false)if(a.removeEventListener)a.removeEventListener(i,c.data(a,"handle"),false);else a.detachEvent&&a.detachEvent("on"+
++i,c.data(a,"handle"));e=null;delete f[i]}}}}for(e in f)break;if(!e){if(B=c.data(a,"handle"))B.elem=null;c.removeData(a,"events");c.removeData(a,"handle")}}}},trigger:function(a,b,d,f){var e=a.type||a;if(!f){a=typeof a==="object"?a[H]?a:c.extend(c.Event(e),a):c.Event(e);if(e.indexOf("!")>=0){a.type=e=e.slice(0,-1);a.exclusive=true}if(!d){a.stopPropagation();this.global[e]&&c.each(c.cache,function(){this.events&&this.events[e]&&c.event.trigger(a,b,this.handle.elem)})}if(!d||d.nodeType===3||d.nodeType===
++8)return w;a.result=w;a.target=d;b=c.makeArray(b);b.unshift(a)}a.currentTarget=d;var i=c.data(d,"handle");i&&i.apply(d,b);var j,o;try{if(!(d&&d.nodeName&&c.noData[d.nodeName.toLowerCase()])){j=d[e];o=d["on"+e]}}catch(p){}i=c.nodeName(d,"a")&&e==="click";if(!f&&j&&!a.isDefaultPrevented()&&!i){this.triggered=true;try{d[e]()}catch(n){}}else if(o&&d["on"+e].apply(d,b)===false)a.result=false;this.triggered=false;if(!a.isPropagationStopped())(d=d.parentNode||d.ownerDocument)&&c.event.trigger(a,b,d,true)},
++handle:function(a){var b,d;a=arguments[0]=c.event.fix(a||A.event);a.currentTarget=this;d=a.type.split(".");a.type=d.shift();b=!d.length&&!a.exclusive;var f=new RegExp("(^|\\.)"+d.slice(0).sort().join("\\.(?:.*\\.)?")+"(\\.|$)");d=(c.data(this,"events")||{})[a.type];for(var e in d){var i=d[e];if(b||f.test(i.type)){a.handler=i;a.data=i.data;i=i.apply(this,arguments);if(i!==w){a.result=i;if(i===false){a.preventDefault();a.stopPropagation()}}if(a.isImmediatePropagationStopped())break}}return a.result},
++props:"altKey attrChange attrName bubbles button cancelable charCode clientX clientY ctrlKey currentTarget data detail eventPhase fromElement handler keyCode layerX layerY metaKey newValue offsetX offsetY originalTarget pageX pageY prevValue relatedNode relatedTarget screenX screenY shiftKey srcElement target toElement view wheelDelta which".split(" "),fix:function(a){if(a[H])return a;var b=a;a=c.Event(b);for(var d=this.props.length,f;d;){f=this.props[--d];a[f]=b[f]}if(!a.target)a.target=a.srcElement||
++s;if(a.target.nodeType===3)a.target=a.target.parentNode;if(!a.relatedTarget&&a.fromElement)a.relatedTarget=a.fromElement===a.target?a.toElement:a.fromElement;if(a.pageX==null&&a.clientX!=null){b=s.documentElement;d=s.body;a.pageX=a.clientX+(b&&b.scrollLeft||d&&d.scrollLeft||0)-(b&&b.clientLeft||d&&d.clientLeft||0);a.pageY=a.clientY+(b&&b.scrollTop||d&&d.scrollTop||0)-(b&&b.clientTop||d&&d.clientTop||0)}if(!a.which&&(a.charCode||a.charCode===0?a.charCode:a.keyCode))a.which=a.charCode||a.keyCode;if(!a.metaKey&&
++a.ctrlKey)a.metaKey=a.ctrlKey;if(!a.which&&a.button!==w)a.which=a.button&1?1:a.button&2?3:a.button&4?2:0;return a},guid:1E8,proxy:c.proxy,special:{ready:{setup:c.bindReady,teardown:c.noop},live:{add:function(a,b){c.extend(a,b||{});a.guid+=b.selector+b.live;c.event.add(this,b.live,qa,b)},remove:function(a){if(a.length){var b=0,d=new RegExp("(^|\\.)"+a[0]+"(\\.|$)");c.each(c.data(this,"events").live||{},function(){d.test(this.type)&&b++});b<1&&c.event.remove(this,a[0],qa)}},special:{}},beforeunload:{setup:function(a,
++b,d){if(this.setInterval)this.onbeforeunload=d;return false},teardown:function(a,b){if(this.onbeforeunload===b)this.onbeforeunload=null}}}};c.Event=function(a){if(!this.preventDefault)return new c.Event(a);if(a&&a.type){this.originalEvent=a;this.type=a.type}else this.type=a;this.timeStamp=K();this[H]=true};c.Event.prototype={preventDefault:function(){this.isDefaultPrevented=ba;var a=this.originalEvent;if(a){a.preventDefault&&a.preventDefault();a.returnValue=false}},stopPropagation:function(){this.isPropagationStopped=
++ba;var a=this.originalEvent;if(a){a.stopPropagation&&a.stopPropagation();a.cancelBubble=true}},stopImmediatePropagation:function(){this.isImmediatePropagationStopped=ba;this.stopPropagation()},isDefaultPrevented:aa,isPropagationStopped:aa,isImmediatePropagationStopped:aa};var Ba=function(a){for(var b=a.relatedTarget;b&&b!==this;)try{b=b.parentNode}catch(d){break}if(b!==this){a.type=a.data;c.event.handle.apply(this,arguments)}},Ca=function(a){a.type=a.data;c.event.handle.apply(this,arguments)};c.each({mouseenter:"mouseover",
++mouseleave:"mouseout"},function(a,b){c.event.special[a]={setup:function(d){c.event.add(this,b,d&&d.selector?Ca:Ba,a)},teardown:function(d){c.event.remove(this,b,d&&d.selector?Ca:Ba)}}});if(!c.support.submitBubbles)c.event.special.submit={setup:function(a,b,d){if(this.nodeName.toLowerCase()!=="form"){c.event.add(this,"click.specialSubmit."+d.guid,function(f){var e=f.target,i=e.type;if((i==="submit"||i==="image")&&c(e).closest("form").length)return pa("submit",this,arguments)});c.event.add(this,"keypress.specialSubmit."+
++d.guid,function(f){var e=f.target,i=e.type;if((i==="text"||i==="password")&&c(e).closest("form").length&&f.keyCode===13)return pa("submit",this,arguments)})}else return false},remove:function(a,b){c.event.remove(this,"click.specialSubmit"+(b?"."+b.guid:""));c.event.remove(this,"keypress.specialSubmit"+(b?"."+b.guid:""))}};if(!c.support.changeBubbles){var ga=/textarea|input|select/i;function Da(a){var b=a.type,d=a.value;if(b==="radio"||b==="checkbox")d=a.checked;else if(b==="select-multiple")d=a.selectedIndex>
++-1?c.map(a.options,function(f){return f.selected}).join("-"):"";else if(a.nodeName.toLowerCase()==="select")d=a.selectedIndex;return d}function ha(a,b){var d=a.target,f,e;if(!(!ga.test(d.nodeName)||d.readOnly)){f=c.data(d,"_change_data");e=Da(d);if(e!==f){if(a.type!=="focusout"||d.type!=="radio")c.data(d,"_change_data",e);if(d.type!=="select"&&(f!=null||e)){a.type="change";return c.event.trigger(a,b,this)}}}}c.event.special.change={filters:{focusout:ha,click:function(a){var b=a.target,d=b.type;if(d===
++"radio"||d==="checkbox"||b.nodeName.toLowerCase()==="select")return ha.call(this,a)},keydown:function(a){var b=a.target,d=b.type;if(a.keyCode===13&&b.nodeName.toLowerCase()!=="textarea"||a.keyCode===32&&(d==="checkbox"||d==="radio")||d==="select-multiple")return ha.call(this,a)},beforeactivate:function(a){a=a.target;a.nodeName.toLowerCase()==="input"&&a.type==="radio"&&c.data(a,"_change_data",Da(a))}},setup:function(a,b,d){for(var f in W)c.event.add(this,f+".specialChange."+d.guid,W[f]);return ga.test(this.nodeName)},
++remove:function(a,b){for(var d in W)c.event.remove(this,d+".specialChange"+(b?"."+b.guid:""),W[d]);return ga.test(this.nodeName)}};var W=c.event.special.change.filters}s.addEventListener&&c.each({focus:"focusin",blur:"focusout"},function(a,b){function d(f){f=c.event.fix(f);f.type=b;return c.event.handle.call(this,f)}c.event.special[b]={setup:function(){this.addEventListener(a,d,true)},teardown:function(){this.removeEventListener(a,d,true)}}});c.each(["bind","one"],function(a,b){c.fn[b]=function(d,
++f,e){if(typeof d==="object"){for(var i in d)this[b](i,f,d[i],e);return this}if(c.isFunction(f)){thisObject=e;e=f;f=w}var j=b==="one"?c.proxy(e,function(o){c(this).unbind(o,j);return e.apply(this,arguments)}):e;return d==="unload"&&b!=="one"?this.one(d,f,e,thisObject):this.each(function(){c.event.add(this,d,j,f)})}});c.fn.extend({unbind:function(a,b){if(typeof a==="object"&&!a.preventDefault){for(var d in a)this.unbind(d,a[d]);return this}return this.each(function(){c.event.remove(this,a,b)})},trigger:function(a,
++b){return this.each(function(){c.event.trigger(a,b,this)})},triggerHandler:function(a,b){if(this[0]){a=c.Event(a);a.preventDefault();a.stopPropagation();c.event.trigger(a,b,this[0]);return a.result}},toggle:function(a){for(var b=arguments,d=1;d<b.length;)c.proxy(a,b[d++]);return this.click(c.proxy(a,function(f){var e=(c.data(this,"lastToggle"+a.guid)||0)%d;c.data(this,"lastToggle"+a.guid,e+1);f.preventDefault();return b[e].apply(this,arguments)||false}))},hover:function(a,b){return this.mouseenter(a).mouseleave(b||
++a)},live:function(a,b,d){if(c.isFunction(b)){d=b;b=w}c(this.context).bind(ra(a,this.selector),{data:b,selector:this.selector,live:a},d);return this},die:function(a,b){c(this.context).unbind(ra(a,this.selector),b?{guid:b.guid+this.selector+a}:null);return this}});c.each("blur focus focusin focusout load resize scroll unload click dblclick mousedown mouseup mousemove mouseover mouseout mouseenter mouseleave change select submit keydown keypress keyup error".split(" "),function(a,b){c.fn[b]=function(d){return d?
++this.bind(b,d):this.trigger(b)};if(c.attrFn)c.attrFn[b]=true});A.attachEvent&&!A.addEventListener&&A.attachEvent("onunload",function(){for(var a in c.cache)if(c.cache[a].handle)try{c.event.remove(c.cache[a].handle.elem)}catch(b){}});(function(){function a(g){for(var h="",k,m=0;g[m];m++){k=g[m];if(k.nodeType===3||k.nodeType===4)h+=k.nodeValue;else if(k.nodeType!==8)h+=a(k.childNodes)}return h}function b(g,h,k,m,r,q){r=0;for(var v=m.length;r<v;r++){var u=m[r];if(u){u=u[g];for(var y=false;u;){if(u.sizcache===
++k){y=m[u.sizset];break}if(u.nodeType===1&&!q){u.sizcache=k;u.sizset=r}if(u.nodeName.toLowerCase()===h){y=u;break}u=u[g]}m[r]=y}}}function d(g,h,k,m,r,q){r=0;for(var v=m.length;r<v;r++){var u=m[r];if(u){u=u[g];for(var y=false;u;){if(u.sizcache===k){y=m[u.sizset];break}if(u.nodeType===1){if(!q){u.sizcache=k;u.sizset=r}if(typeof h!=="string"){if(u===h){y=true;break}}else if(p.filter(h,[u]).length>0){y=u;break}}u=u[g]}m[r]=y}}}var f=/((?:\((?:\([^()]+\)|[^()]+)+\)|\[(?:\[[^[\]]*\]|['"][^'"]*['"]|[^[\]'"]+)+\]|\\.|[^ >+~,(\[\\]+)+|[>+~])(\s*,\s*)?((?:.|\r|\n)*)/g,
++e=0,i=Object.prototype.toString,j=false,o=true;[0,0].sort(function(){o=false;return 0});var p=function(g,h,k,m){k=k||[];var r=h=h||s;if(h.nodeType!==1&&h.nodeType!==9)return[];if(!g||typeof g!=="string")return k;for(var q=[],v,u,y,S,I=true,N=x(h),J=g;(f.exec(""),v=f.exec(J))!==null;){J=v[3];q.push(v[1]);if(v[2]){S=v[3];break}}if(q.length>1&&t.exec(g))if(q.length===2&&n.relative[q[0]])u=ia(q[0]+q[1],h);else for(u=n.relative[q[0]]?[h]:p(q.shift(),h);q.length;){g=q.shift();if(n.relative[g])g+=q.shift();
++u=ia(g,u)}else{if(!m&&q.length>1&&h.nodeType===9&&!N&&n.match.ID.test(q[0])&&!n.match.ID.test(q[q.length-1])){v=p.find(q.shift(),h,N);h=v.expr?p.filter(v.expr,v.set)[0]:v.set[0]}if(h){v=m?{expr:q.pop(),set:B(m)}:p.find(q.pop(),q.length===1&&(q[0]==="~"||q[0]==="+")&&h.parentNode?h.parentNode:h,N);u=v.expr?p.filter(v.expr,v.set):v.set;if(q.length>0)y=B(u);else I=false;for(;q.length;){var E=q.pop();v=E;if(n.relative[E])v=q.pop();else E="";if(v==null)v=h;n.relative[E](y,v,N)}}else y=[]}y||(y=u);if(!y)throw"Syntax error, unrecognized expression: "+
++(E||g);if(i.call(y)==="[object Array]")if(I)if(h&&h.nodeType===1)for(g=0;y[g]!=null;g++){if(y[g]&&(y[g]===true||y[g].nodeType===1&&F(h,y[g])))k.push(u[g])}else for(g=0;y[g]!=null;g++)y[g]&&y[g].nodeType===1&&k.push(u[g]);else k.push.apply(k,y);else B(y,k);if(S){p(S,r,k,m);p.uniqueSort(k)}return k};p.uniqueSort=function(g){if(D){j=o;g.sort(D);if(j)for(var h=1;h<g.length;h++)g[h]===g[h-1]&&g.splice(h--,1)}return g};p.matches=function(g,h){return p(g,null,null,h)};p.find=function(g,h,k){var m,r;if(!g)return[];
++for(var q=0,v=n.order.length;q<v;q++){var u=n.order[q];if(r=n.leftMatch[u].exec(g)){var y=r[1];r.splice(1,1);if(y.substr(y.length-1)!=="\\"){r[1]=(r[1]||"").replace(/\\/g,"");m=n.find[u](r,h,k);if(m!=null){g=g.replace(n.match[u],"");break}}}}m||(m=h.getElementsByTagName("*"));return{set:m,expr:g}};p.filter=function(g,h,k,m){for(var r=g,q=[],v=h,u,y,S=h&&h[0]&&x(h[0]);g&&h.length;){for(var I in n.filter)if((u=n.leftMatch[I].exec(g))!=null&&u[2]){var N=n.filter[I],J,E;E=u[1];y=false;u.splice(1,1);if(E.substr(E.length-
++1)!=="\\"){if(v===q)q=[];if(n.preFilter[I])if(u=n.preFilter[I](u,v,k,q,m,S)){if(u===true)continue}else y=J=true;if(u)for(var X=0;(E=v[X])!=null;X++)if(E){J=N(E,u,X,v);var Ea=m^!!J;if(k&&J!=null)if(Ea)y=true;else v[X]=false;else if(Ea){q.push(E);y=true}}if(J!==w){k||(v=q);g=g.replace(n.match[I],"");if(!y)return[];break}}}if(g===r)if(y==null)throw"Syntax error, unrecognized expression: "+g;else break;r=g}return v};var n=p.selectors={order:["ID","NAME","TAG"],match:{ID:/#((?:[\w\u00c0-\uFFFF-]|\\.)+)/,
++CLASS:/\.((?:[\w\u00c0-\uFFFF-]|\\.)+)/,NAME:/\[name=['"]*((?:[\w\u00c0-\uFFFF-]|\\.)+)['"]*\]/,ATTR:/\[\s*((?:[\w\u00c0-\uFFFF-]|\\.)+)\s*(?:(\S?=)\s*(['"]*)(.*?)\3|)\s*\]/,TAG:/^((?:[\w\u00c0-\uFFFF\*-]|\\.)+)/,CHILD:/:(only|nth|last|first)-child(?:\((even|odd|[\dn+-]*)\))?/,POS:/:(nth|eq|gt|lt|first|last|even|odd)(?:\((\d*)\))?(?=[^-]|$)/,PSEUDO:/:((?:[\w\u00c0-\uFFFF-]|\\.)+)(?:\((['"]?)((?:\([^\)]+\)|[^\(\)]*)+)\2\))?/},leftMatch:{},attrMap:{"class":"className","for":"htmlFor"},attrHandle:{href:function(g){return g.getAttribute("href")}},
++relative:{"+":function(g,h){var k=typeof h==="string",m=k&&!/\W/.test(h);k=k&&!m;if(m)h=h.toLowerCase();m=0;for(var r=g.length,q;m<r;m++)if(q=g[m]){for(;(q=q.previousSibling)&&q.nodeType!==1;);g[m]=k||q&&q.nodeName.toLowerCase()===h?q||false:q===h}k&&p.filter(h,g,true)},">":function(g,h){var k=typeof h==="string";if(k&&!/\W/.test(h)){h=h.toLowerCase();for(var m=0,r=g.length;m<r;m++){var q=g[m];if(q){k=q.parentNode;g[m]=k.nodeName.toLowerCase()===h?k:false}}}else{m=0;for(r=g.length;m<r;m++)if(q=g[m])g[m]=
++k?q.parentNode:q.parentNode===h;k&&p.filter(h,g,true)}},"":function(g,h,k){var m=e++,r=d;if(typeof h==="string"&&!/\W/.test(h)){var q=h=h.toLowerCase();r=b}r("parentNode",h,m,g,q,k)},"~":function(g,h,k){var m=e++,r=d;if(typeof h==="string"&&!/\W/.test(h)){var q=h=h.toLowerCase();r=b}r("previousSibling",h,m,g,q,k)}},find:{ID:function(g,h,k){if(typeof h.getElementById!=="undefined"&&!k)return(g=h.getElementById(g[1]))?[g]:[]},NAME:function(g,h){if(typeof h.getElementsByName!=="undefined"){var k=[];
++h=h.getElementsByName(g[1]);for(var m=0,r=h.length;m<r;m++)h[m].getAttribute("name")===g[1]&&k.push(h[m]);return k.length===0?null:k}},TAG:function(g,h){return h.getElementsByTagName(g[1])}},preFilter:{CLASS:function(g,h,k,m,r,q){g=" "+g[1].replace(/\\/g,"")+" ";if(q)return g;q=0;for(var v;(v=h[q])!=null;q++)if(v)if(r^(v.className&&(" "+v.className+" ").replace(/[\t\n]/g," ").indexOf(g)>=0))k||m.push(v);else if(k)h[q]=false;return false},ID:function(g){return g[1].replace(/\\/g,"")},TAG:function(g){return g[1].toLowerCase()},
++CHILD:function(g){if(g[1]==="nth"){var h=/(-?)(\d*)n((?:\+|-)?\d*)/.exec(g[2]==="even"&&"2n"||g[2]==="odd"&&"2n+1"||!/\D/.test(g[2])&&"0n+"+g[2]||g[2]);g[2]=h[1]+(h[2]||1)-0;g[3]=h[3]-0}g[0]=e++;return g},ATTR:function(g,h,k,m,r,q){h=g[1].replace(/\\/g,"");if(!q&&n.attrMap[h])g[1]=n.attrMap[h];if(g[2]==="~=")g[4]=" "+g[4]+" ";return g},PSEUDO:function(g,h,k,m,r){if(g[1]==="not")if((f.exec(g[3])||"").length>1||/^\w/.test(g[3]))g[3]=p(g[3],null,null,h);else{g=p.filter(g[3],h,k,true^r);k||m.push.apply(m,
++g);return false}else if(n.match.POS.test(g[0])||n.match.CHILD.test(g[0]))return true;return g},POS:function(g){g.unshift(true);return g}},filters:{enabled:function(g){return g.disabled===false&&g.type!=="hidden"},disabled:function(g){return g.disabled===true},checked:function(g){return g.checked===true},selected:function(g){return g.selected===true},parent:function(g){return!!g.firstChild},empty:function(g){return!g.firstChild},has:function(g,h,k){return!!p(k[3],g).length},header:function(g){return/h\d/i.test(g.nodeName)},
++text:function(g){return"text"===g.type},radio:function(g){return"radio"===g.type},checkbox:function(g){return"checkbox"===g.type},file:function(g){return"file"===g.type},password:function(g){return"password"===g.type},submit:function(g){return"submit"===g.type},image:function(g){return"image"===g.type},reset:function(g){return"reset"===g.type},button:function(g){return"button"===g.type||g.nodeName.toLowerCase()==="button"},input:function(g){return/input|select|textarea|button/i.test(g.nodeName)}},
++setFilters:{first:function(g,h){return h===0},last:function(g,h,k,m){return h===m.length-1},even:function(g,h){return h%2===0},odd:function(g,h){return h%2===1},lt:function(g,h,k){return h<k[3]-0},gt:function(g,h,k){return h>k[3]-0},nth:function(g,h,k){return k[3]-0===h},eq:function(g,h,k){return k[3]-0===h}},filter:{PSEUDO:function(g,h,k,m){var r=h[1],q=n.filters[r];if(q)return q(g,k,h,m);else if(r==="contains")return(g.textContent||g.innerText||a([g])||"").indexOf(h[3])>=0;else if(r==="not"){h=
++h[3];k=0;for(m=h.length;k<m;k++)if(h[k]===g)return false;return true}else throw"Syntax error, unrecognized expression: "+r;},CHILD:function(g,h){var k=h[1],m=g;switch(k){case "only":case "first":for(;m=m.previousSibling;)if(m.nodeType===1)return false;if(k==="first")return true;m=g;case "last":for(;m=m.nextSibling;)if(m.nodeType===1)return false;return true;case "nth":k=h[2];var r=h[3];if(k===1&&r===0)return true;h=h[0];var q=g.parentNode;if(q&&(q.sizcache!==h||!g.nodeIndex)){var v=0;for(m=q.firstChild;m;m=
++m.nextSibling)if(m.nodeType===1)m.nodeIndex=++v;q.sizcache=h}g=g.nodeIndex-r;return k===0?g===0:g%k===0&&g/k>=0}},ID:function(g,h){return g.nodeType===1&&g.getAttribute("id")===h},TAG:function(g,h){return h==="*"&&g.nodeType===1||g.nodeName.toLowerCase()===h},CLASS:function(g,h){return(" "+(g.className||g.getAttribute("class"))+" ").indexOf(h)>-1},ATTR:function(g,h){var k=h[1];g=n.attrHandle[k]?n.attrHandle[k](g):g[k]!=null?g[k]:g.getAttribute(k);k=g+"";var m=h[2];h=h[4];return g==null?m==="!=":m===
++"="?k===h:m==="*="?k.indexOf(h)>=0:m==="~="?(" "+k+" ").indexOf(h)>=0:!h?k&&g!==false:m==="!="?k!==h:m==="^="?k.indexOf(h)===0:m==="$="?k.substr(k.length-h.length)===h:m==="|="?k===h||k.substr(0,h.length+1)===h+"-":false},POS:function(g,h,k,m){var r=n.setFilters[h[2]];if(r)return r(g,k,h,m)}}},t=n.match.POS;for(var z in n.match){n.match[z]=new RegExp(n.match[z].source+/(?![^\[]*\])(?![^\(]*\))/.source);n.leftMatch[z]=new RegExp(/(^(?:.|\r|\n)*?)/.source+n.match[z].source.replace(/\\(\d+)/g,function(g,
++h){return"\\"+(h-0+1)}))}var B=function(g,h){g=Array.prototype.slice.call(g,0);if(h){h.push.apply(h,g);return h}return g};try{Array.prototype.slice.call(s.documentElement.childNodes,0)}catch(C){B=function(g,h){h=h||[];if(i.call(g)==="[object Array]")Array.prototype.push.apply(h,g);else if(typeof g.length==="number")for(var k=0,m=g.length;k<m;k++)h.push(g[k]);else for(k=0;g[k];k++)h.push(g[k]);return h}}var D;if(s.documentElement.compareDocumentPosition)D=function(g,h){if(!g.compareDocumentPosition||
++!h.compareDocumentPosition){if(g==h)j=true;return g.compareDocumentPosition?-1:1}g=g.compareDocumentPosition(h)&4?-1:g===h?0:1;if(g===0)j=true;return g};else if("sourceIndex"in s.documentElement)D=function(g,h){if(!g.sourceIndex||!h.sourceIndex){if(g==h)j=true;return g.sourceIndex?-1:1}g=g.sourceIndex-h.sourceIndex;if(g===0)j=true;return g};else if(s.createRange)D=function(g,h){if(!g.ownerDocument||!h.ownerDocument){if(g==h)j=true;return g.ownerDocument?-1:1}var k=g.ownerDocument.createRange(),m=
++h.ownerDocument.createRange();k.setStart(g,0);k.setEnd(g,0);m.setStart(h,0);m.setEnd(h,0);g=k.compareBoundaryPoints(Range.START_TO_END,m);if(g===0)j=true;return g};(function(){var g=s.createElement("div"),h="script"+(new Date).getTime();g.innerHTML="<a name='"+h+"'/>";var k=s.documentElement;k.insertBefore(g,k.firstChild);if(s.getElementById(h)){n.find.ID=function(m,r,q){if(typeof r.getElementById!=="undefined"&&!q)return(r=r.getElementById(m[1]))?r.id===m[1]||typeof r.getAttributeNode!=="undefined"&&
++r.getAttributeNode("id").nodeValue===m[1]?[r]:w:[]};n.filter.ID=function(m,r){var q=typeof m.getAttributeNode!=="undefined"&&m.getAttributeNode("id");return m.nodeType===1&&q&&q.nodeValue===r}}k.removeChild(g);k=g=null})();(function(){var g=s.createElement("div");g.appendChild(s.createComment(""));if(g.getElementsByTagName("*").length>0)n.find.TAG=function(h,k){k=k.getElementsByTagName(h[1]);if(h[1]==="*"){h=[];for(var m=0;k[m];m++)k[m].nodeType===1&&h.push(k[m]);k=h}return k};g.innerHTML="<a href='#'></a>";
++if(g.firstChild&&typeof g.firstChild.getAttribute!=="undefined"&&g.firstChild.getAttribute("href")!=="#")n.attrHandle.href=function(h){return h.getAttribute("href",2)};g=null})();s.querySelectorAll&&function(){var g=p,h=s.createElement("div");h.innerHTML="<p class='TEST'></p>";if(!(h.querySelectorAll&&h.querySelectorAll(".TEST").length===0)){p=function(m,r,q,v){r=r||s;if(!v&&r.nodeType===9&&!x(r))try{return B(r.querySelectorAll(m),q)}catch(u){}return g(m,r,q,v)};for(var k in g)p[k]=g[k];h=null}}();
++(function(){var g=s.createElement("div");g.innerHTML="<div class='test e'></div><div class='test'></div>";if(!(!g.getElementsByClassName||g.getElementsByClassName("e").length===0)){g.lastChild.className="e";if(g.getElementsByClassName("e").length!==1){n.order.splice(1,0,"CLASS");n.find.CLASS=function(h,k,m){if(typeof k.getElementsByClassName!=="undefined"&&!m)return k.getElementsByClassName(h[1])};g=null}}})();var F=s.compareDocumentPosition?function(g,h){return g.compareDocumentPosition(h)&16}:function(g,
++h){return g!==h&&(g.contains?g.contains(h):true)},x=function(g){return(g=(g?g.ownerDocument||g:0).documentElement)?g.nodeName!=="HTML":false},ia=function(g,h){var k=[],m="",r;for(h=h.nodeType?[h]:h;r=n.match.PSEUDO.exec(g);){m+=r[0];g=g.replace(n.match.PSEUDO,"")}g=n.relative[g]?g+"*":g;r=0;for(var q=h.length;r<q;r++)p(g,h[r],k);return p.filter(m,k)};c.find=p;c.expr=p.selectors;c.expr[":"]=c.expr.filters;c.unique=p.uniqueSort;c.getText=a;c.isXMLDoc=x;c.contains=F})();var ab=/Until$/,bb=/^(?:parents|prevUntil|prevAll)/,
++cb=/,/;R=Array.prototype.slice;var Fa=function(a,b,d){if(c.isFunction(b))return c.grep(a,function(e,i){return!!b.call(e,i,e)===d});else if(b.nodeType)return c.grep(a,function(e){return e===b===d});else if(typeof b==="string"){var f=c.grep(a,function(e){return e.nodeType===1});if(Pa.test(b))return c.filter(b,f,!d);else b=c.filter(b,a)}return c.grep(a,function(e){return c.inArray(e,b)>=0===d})};c.fn.extend({find:function(a){for(var b=this.pushStack("","find",a),d=0,f=0,e=this.length;f<e;f++){d=b.length;
++c.find(a,this[f],b);if(f>0)for(var i=d;i<b.length;i++)for(var j=0;j<d;j++)if(b[j]===b[i]){b.splice(i--,1);break}}return b},has:function(a){var b=c(a);return this.filter(function(){for(var d=0,f=b.length;d<f;d++)if(c.contains(this,b[d]))return true})},not:function(a){return this.pushStack(Fa(this,a,false),"not",a)},filter:function(a){return this.pushStack(Fa(this,a,true),"filter",a)},is:function(a){return!!a&&c.filter(a,this).length>0},closest:function(a,b){if(c.isArray(a)){var d=[],f=this[0],e,i=
++{},j;if(f&&a.length){e=0;for(var o=a.length;e<o;e++){j=a[e];i[j]||(i[j]=c.expr.match.POS.test(j)?c(j,b||this.context):j)}for(;f&&f.ownerDocument&&f!==b;){for(j in i){e=i[j];if(e.jquery?e.index(f)>-1:c(f).is(e)){d.push({selector:j,elem:f});delete i[j]}}f=f.parentNode}}return d}var p=c.expr.match.POS.test(a)?c(a,b||this.context):null;return this.map(function(n,t){for(;t&&t.ownerDocument&&t!==b;){if(p?p.index(t)>-1:c(t).is(a))return t;t=t.parentNode}return null})},index:function(a){if(!a||typeof a===
++"string")return c.inArray(this[0],a?c(a):this.parent().children());return c.inArray(a.jquery?a[0]:a,this)},add:function(a,b){a=typeof a==="string"?c(a,b||this.context):c.makeArray(a);b=c.merge(this.get(),a);return this.pushStack(sa(a[0])||sa(b[0])?b:c.unique(b))},andSelf:function(){return this.add(this.prevObject)}});c.each({parent:function(a){return(a=a.parentNode)&&a.nodeType!==11?a:null},parents:function(a){return c.dir(a,"parentNode")},parentsUntil:function(a,b,d){return c.dir(a,"parentNode",
++d)},next:function(a){return c.nth(a,2,"nextSibling")},prev:function(a){return c.nth(a,2,"previousSibling")},nextAll:function(a){return c.dir(a,"nextSibling")},prevAll:function(a){return c.dir(a,"previousSibling")},nextUntil:function(a,b,d){return c.dir(a,"nextSibling",d)},prevUntil:function(a,b,d){return c.dir(a,"previousSibling",d)},siblings:function(a){return c.sibling(a.parentNode.firstChild,a)},children:function(a){return c.sibling(a.firstChild)},contents:function(a){return c.nodeName(a,"iframe")?
++a.contentDocument||a.contentWindow.document:c.makeArray(a.childNodes)}},function(a,b){c.fn[a]=function(d,f){var e=c.map(this,b,d);ab.test(a)||(f=d);if(f&&typeof f==="string")e=c.filter(f,e);e=this.length>1?c.unique(e):e;if((this.length>1||cb.test(f))&&bb.test(a))e=e.reverse();return this.pushStack(e,a,R.call(arguments).join(","))}});c.extend({filter:function(a,b,d){if(d)a=":not("+a+")";return c.find.matches(a,b)},dir:function(a,b,d){var f=[];for(a=a[b];a&&a.nodeType!==9&&(d===w||!c(a).is(d));){a.nodeType===
++1&&f.push(a);a=a[b]}return f},nth:function(a,b,d){b=b||1;for(var f=0;a;a=a[d])if(a.nodeType===1&&++f===b)break;return a},sibling:function(a,b){for(var d=[];a;a=a.nextSibling)a.nodeType===1&&a!==b&&d.push(a);return d}});var Ga=/ jQuery\d+="(?:\d+|null)"/g,Y=/^\s+/,db=/(<([\w:]+)[^>]*?)\/>/g,eb=/^(?:area|br|col|embed|hr|img|input|link|meta|param)$/i,Ha=/<([\w:]+)/,fb=/<tbody/i,gb=/<|&\w+;/,hb=function(a,b,d){return eb.test(d)?a:b+"></"+d+">"},G={option:[1,"<select multiple='multiple'>","</select>"],
++legend:[1,"<fieldset>","</fieldset>"],thead:[1,"<table>","</table>"],tr:[2,"<table><tbody>","</tbody></table>"],td:[3,"<table><tbody><tr>","</tr></tbody></table>"],col:[2,"<table><tbody></tbody><colgroup>","</colgroup></table>"],area:[1,"<map>","</map>"],_default:[0,"",""]};G.optgroup=G.option;G.tbody=G.tfoot=G.colgroup=G.caption=G.thead;G.th=G.td;if(!c.support.htmlSerialize)G._default=[1,"div<div>","</div>"];c.fn.extend({text:function(a){if(c.isFunction(a))return this.each(function(b){var d=c(this);
++return d.text(a.call(this,b,d.text()))});if(typeof a!=="object"&&a!==w)return this.empty().append((this[0]&&this[0].ownerDocument||s).createTextNode(a));return c.getText(this)},wrapAll:function(a){if(c.isFunction(a))return this.each(function(d){c(this).wrapAll(a.call(this,d))});if(this[0]){var b=c(a,this[0].ownerDocument).eq(0).clone(true);this[0].parentNode&&b.insertBefore(this[0]);b.map(function(){for(var d=this;d.firstChild&&d.firstChild.nodeType===1;)d=d.firstChild;return d}).append(this)}return this},
++wrapInner:function(a){return this.each(function(){var b=c(this),d=b.contents();d.length?d.wrapAll(a):b.append(a)})},wrap:function(a){return this.each(function(){c(this).wrapAll(a)})},unwrap:function(){return this.parent().each(function(){c.nodeName(this,"body")||c(this).replaceWith(this.childNodes)}).end()},append:function(){return this.domManip(arguments,true,function(a){this.nodeType===1&&this.appendChild(a)})},prepend:function(){return this.domManip(arguments,true,function(a){this.nodeType===1&&
++this.insertBefore(a,this.firstChild)})},before:function(){if(this[0]&&this[0].parentNode)return this.domManip(arguments,false,function(b){this.parentNode.insertBefore(b,this)});else if(arguments.length){var a=c(arguments[0]);a.push.apply(a,this.toArray());return this.pushStack(a,"before",arguments)}},after:function(){if(this[0]&&this[0].parentNode)return this.domManip(arguments,false,function(b){this.parentNode.insertBefore(b,this.nextSibling)});else if(arguments.length){var a=this.pushStack(this,
++"after",arguments);a.push.apply(a,c(arguments[0]).toArray());return a}},clone:function(a){var b=this.map(function(){if(!c.support.noCloneEvent&&!c.isXMLDoc(this)){var d=this.outerHTML,f=this.ownerDocument;if(!d){d=f.createElement("div");d.appendChild(this.cloneNode(true));d=d.innerHTML}return c.clean([d.replace(Ga,"").replace(Y,"")],f)[0]}else return this.cloneNode(true)});if(a===true){ta(this,b);ta(this.find("*"),b.find("*"))}return b},html:function(a){if(a===w)return this[0]&&this[0].nodeType===
++1?this[0].innerHTML.replace(Ga,""):null;else if(typeof a==="string"&&!/<script/i.test(a)&&(c.support.leadingWhitespace||!Y.test(a))&&!G[(Ha.exec(a)||["",""])[1].toLowerCase()])try{for(var b=0,d=this.length;b<d;b++)if(this[b].nodeType===1){T(this[b].getElementsByTagName("*"));this[b].innerHTML=a}}catch(f){this.empty().append(a)}else c.isFunction(a)?this.each(function(e){var i=c(this),j=i.html();i.empty().append(function(){return a.call(this,e,j)})}):this.empty().append(a);return this},replaceWith:function(a){if(this[0]&&
++this[0].parentNode){c.isFunction(a)||(a=c(a).detach());return this.each(function(){var b=this.nextSibling,d=this.parentNode;c(this).remove();b?c(b).before(a):c(d).append(a)})}else return this.pushStack(c(c.isFunction(a)?a():a),"replaceWith",a)},detach:function(a){return this.remove(a,true)},domManip:function(a,b,d){function f(t){return c.nodeName(t,"table")?t.getElementsByTagName("tbody")[0]||t.appendChild(t.ownerDocument.createElement("tbody")):t}var e,i,j=a[0],o=[];if(c.isFunction(j))return this.each(function(t){var z=
++c(this);a[0]=j.call(this,t,b?z.html():w);return z.domManip(a,b,d)});if(this[0]){e=a[0]&&a[0].parentNode&&a[0].parentNode.nodeType===11?{fragment:a[0].parentNode}:ua(a,this,o);if(i=e.fragment.firstChild){b=b&&c.nodeName(i,"tr");for(var p=0,n=this.length;p<n;p++)d.call(b?f(this[p],i):this[p],e.cacheable||this.length>1||p>0?e.fragment.cloneNode(true):e.fragment)}o&&c.each(o,La)}return this}});c.fragments={};c.each({appendTo:"append",prependTo:"prepend",insertBefore:"before",insertAfter:"after",replaceAll:"replaceWith"},
++function(a,b){c.fn[a]=function(d){var f=[];d=c(d);for(var e=0,i=d.length;e<i;e++){var j=(e>0?this.clone(true):this).get();c.fn[b].apply(c(d[e]),j);f=f.concat(j)}return this.pushStack(f,a,d.selector)}});c.each({remove:function(a,b){if(!a||c.filter(a,[this]).length){if(!b&&this.nodeType===1){T(this.getElementsByTagName("*"));T([this])}this.parentNode&&this.parentNode.removeChild(this)}},empty:function(){for(this.nodeType===1&&T(this.getElementsByTagName("*"));this.firstChild;)this.removeChild(this.firstChild)}},
++function(a,b){c.fn[a]=function(){return this.each(b,arguments)}});c.extend({clean:function(a,b,d,f){b=b||s;if(typeof b.createElement==="undefined")b=b.ownerDocument||b[0]&&b[0].ownerDocument||s;var e=[];c.each(a,function(i,j){if(typeof j==="number")j+="";if(j){if(typeof j==="string"&&!gb.test(j))j=b.createTextNode(j);else if(typeof j==="string"){j=j.replace(db,hb);var o=(Ha.exec(j)||["",""])[1].toLowerCase(),p=G[o]||G._default,n=p[0];i=b.createElement("div");for(i.innerHTML=p[1]+j+p[2];n--;)i=i.lastChild;
++if(!c.support.tbody){n=fb.test(j);o=o==="table"&&!n?i.firstChild&&i.firstChild.childNodes:p[1]==="<table>"&&!n?i.childNodes:[];for(p=o.length-1;p>=0;--p)c.nodeName(o[p],"tbody")&&!o[p].childNodes.length&&o[p].parentNode.removeChild(o[p])}!c.support.leadingWhitespace&&Y.test(j)&&i.insertBefore(b.createTextNode(Y.exec(j)[0]),i.firstChild);j=c.makeArray(i.childNodes)}if(j.nodeType)e.push(j);else e=c.merge(e,j)}});if(d)for(a=0;e[a];a++)if(f&&c.nodeName(e[a],"script")&&(!e[a].type||e[a].type.toLowerCase()===
++"text/javascript"))f.push(e[a].parentNode?e[a].parentNode.removeChild(e[a]):e[a]);else{e[a].nodeType===1&&e.splice.apply(e,[a+1,0].concat(c.makeArray(e[a].getElementsByTagName("script"))));d.appendChild(e[a])}return e}});var ib=/z-?index|font-?weight|opacity|zoom|line-?height/i,Ia=/alpha\([^)]*\)/,Ja=/opacity=([^)]*)/,ja=/float/i,ka=/-([a-z])/ig,jb=/([A-Z])/g,kb=/^-?\d+(?:px)?$/i,lb=/^-?\d/,mb={position:"absolute",visibility:"hidden",display:"block"},nb=["Left","Right"],ob=["Top","Bottom"],pb=s.defaultView&&
++s.defaultView.getComputedStyle,Ka=c.support.cssFloat?"cssFloat":"styleFloat",la=function(a,b){return b.toUpperCase()};c.fn.css=function(a,b){return $(this,a,b,true,function(d,f,e){if(e===w)return c.curCSS(d,f);if(typeof e==="number"&&!ib.test(f))e+="px";c.style(d,f,e)})};c.extend({style:function(a,b,d){if(!a||a.nodeType===3||a.nodeType===8)return w;if((b==="width"||b==="height")&&parseFloat(d)<0)d=w;var f=a.style||a,e=d!==w;if(!c.support.opacity&&b==="opacity"){if(e){f.zoom=1;b=parseInt(d,10)+""===
++"NaN"?"":"alpha(opacity="+d*100+")";a=f.filter||c.curCSS(a,"filter")||"";f.filter=Ia.test(a)?a.replace(Ia,b):b}return f.filter&&f.filter.indexOf("opacity=")>=0?parseFloat(Ja.exec(f.filter)[1])/100+"":""}if(ja.test(b))b=Ka;b=b.replace(ka,la);if(e)f[b]=d;return f[b]},css:function(a,b,d,f){if(b==="width"||b==="height"){var e,i=b==="width"?nb:ob;function j(){e=b==="width"?a.offsetWidth:a.offsetHeight;f!=="border"&&c.each(i,function(){f||(e-=parseFloat(c.curCSS(a,"padding"+this,true))||0);if(f==="margin")e+=
++parseFloat(c.curCSS(a,"margin"+this,true))||0;else e-=parseFloat(c.curCSS(a,"border"+this+"Width",true))||0})}a.offsetWidth!==0?j():c.swap(a,mb,j);return Math.max(0,Math.round(e))}return c.curCSS(a,b,d)},curCSS:function(a,b,d){var f,e=a.style;if(!c.support.opacity&&b==="opacity"&&a.currentStyle){f=Ja.test(a.currentStyle.filter||"")?parseFloat(RegExp.$1)/100+"":"";return f===""?"1":f}if(ja.test(b))b=Ka;if(!d&&e&&e[b])f=e[b];else if(pb){if(ja.test(b))b="float";b=b.replace(jb,"-$1").toLowerCase();e=
++a.ownerDocument.defaultView;if(!e)return null;if(a=e.getComputedStyle(a,null))f=a.getPropertyValue(b);if(b==="opacity"&&f==="")f="1"}else if(a.currentStyle){d=b.replace(ka,la);f=a.currentStyle[b]||a.currentStyle[d];if(!kb.test(f)&&lb.test(f)){b=e.left;var i=a.runtimeStyle.left;a.runtimeStyle.left=a.currentStyle.left;e.left=d==="fontSize"?"1em":f||0;f=e.pixelLeft+"px";e.left=b;a.runtimeStyle.left=i}}return f},swap:function(a,b,d){var f={};for(var e in b){f[e]=a.style[e];a.style[e]=b[e]}d.call(a);for(e in b)a.style[e]=
++f[e]}});if(c.expr&&c.expr.filters){c.expr.filters.hidden=function(a){var b=a.offsetWidth,d=a.offsetHeight,f=a.nodeName.toLowerCase()==="tr";return b===0&&d===0&&!f?true:b>0&&d>0&&!f?false:c.curCSS(a,"display")==="none"};c.expr.filters.visible=function(a){return!c.expr.filters.hidden(a)}}var qb=K(),rb=/<script(.|\s)*?\/script>/gi,sb=/select|textarea/i,tb=/color|date|datetime|email|hidden|month|number|password|range|search|tel|text|time|url|week/i,O=/=\?(&|$)/,ma=/\?/,ub=/(\?|&)_=.*?(&|$)/,vb=/^(\w+:)?\/\/([^\/?#]+)/,
++wb=/%20/g;c.fn.extend({_load:c.fn.load,load:function(a,b,d){if(typeof a!=="string")return this._load(a);else if(!this.length)return this;var f=a.indexOf(" ");if(f>=0){var e=a.slice(f,a.length);a=a.slice(0,f)}f="GET";if(b)if(c.isFunction(b)){d=b;b=null}else if(typeof b==="object"){b=c.param(b,c.ajaxSettings.traditional);f="POST"}c.ajax({url:a,type:f,dataType:"html",data:b,context:this,complete:function(i,j){if(j==="success"||j==="notmodified")this.html(e?c("<div />").append(i.responseText.replace(rb,
++"")).find(e):i.responseText);d&&this.each(d,[i.responseText,j,i])}});return this},serialize:function(){return c.param(this.serializeArray())},serializeArray:function(){return this.map(function(){return this.elements?c.makeArray(this.elements):this}).filter(function(){return this.name&&!this.disabled&&(this.checked||sb.test(this.nodeName)||tb.test(this.type))}).map(function(a,b){a=c(this).val();return a==null?null:c.isArray(a)?c.map(a,function(d){return{name:b.name,value:d}}):{name:b.name,value:a}}).get()}});
++c.each("ajaxStart ajaxStop ajaxComplete ajaxError ajaxSuccess ajaxSend".split(" "),function(a,b){c.fn[b]=function(d){return this.bind(b,d)}});c.extend({get:function(a,b,d,f){if(c.isFunction(b)){f=f||d;d=b;b=null}return c.ajax({type:"GET",url:a,data:b,success:d,dataType:f})},getScript:function(a,b){return c.get(a,null,b,"script")},getJSON:function(a,b,d){return c.get(a,b,d,"json")},post:function(a,b,d,f){if(c.isFunction(b)){f=f||d;d=b;b={}}return c.ajax({type:"POST",url:a,data:b,success:d,dataType:f})},
++ajaxSetup:function(a){c.extend(c.ajaxSettings,a)},ajaxSettings:{url:location.href,global:true,type:"GET",contentType:"application/x-www-form-urlencoded",processData:true,async:true,xhr:A.XMLHttpRequest&&(A.location.protocol!=="file:"||!A.ActiveXObject)?function(){return new A.XMLHttpRequest}:function(){try{return new A.ActiveXObject("Microsoft.XMLHTTP")}catch(a){}},accepts:{xml:"application/xml, text/xml",html:"text/html",script:"text/javascript, application/javascript",json:"application/json, text/javascript",
++text:"text/plain",_default:"*/*"}},lastModified:{},etag:{},ajax:function(a){function b(){e.success&&e.success.call(p,o,j,x);e.global&&f("ajaxSuccess",[x,e])}function d(){e.complete&&e.complete.call(p,x,j);e.global&&f("ajaxComplete",[x,e]);e.global&&!--c.active&&c.event.trigger("ajaxStop")}function f(r,q){(e.context?c(e.context):c.event).trigger(r,q)}var e=c.extend(true,{},c.ajaxSettings,a),i,j,o,p=e.context||e,n=e.type.toUpperCase();if(e.data&&e.processData&&typeof e.data!=="string")e.data=c.param(e.data,
++e.traditional);if(e.dataType==="jsonp"){if(n==="GET")O.test(e.url)||(e.url+=(ma.test(e.url)?"&":"?")+(e.jsonp||"callback")+"=?");else if(!e.data||!O.test(e.data))e.data=(e.data?e.data+"&":"")+(e.jsonp||"callback")+"=?";e.dataType="json"}if(e.dataType==="json"&&(e.data&&O.test(e.data)||O.test(e.url))){i=e.jsonpCallback||"jsonp"+qb++;if(e.data)e.data=(e.data+"").replace(O,"="+i+"$1");e.url=e.url.replace(O,"="+i+"$1");e.dataType="script";A[i]=A[i]||function(r){o=r;b();d();A[i]=w;try{delete A[i]}catch(q){}B&&
++B.removeChild(C)}}if(e.dataType==="script"&&e.cache===null)e.cache=false;if(e.cache===false&&n==="GET"){var t=K(),z=e.url.replace(ub,"$1_="+t+"$2");e.url=z+(z===e.url?(ma.test(e.url)?"&":"?")+"_="+t:"")}if(e.data&&n==="GET")e.url+=(ma.test(e.url)?"&":"?")+e.data;e.global&&!c.active++&&c.event.trigger("ajaxStart");t=(t=vb.exec(e.url))&&(t[1]&&t[1]!==location.protocol||t[2]!==location.host);if(e.dataType==="script"&&n==="GET"&&t){var B=s.getElementsByTagName("head")[0]||s.documentElement,C=s.createElement("script");
++C.src=e.url;if(e.scriptCharset)C.charset=e.scriptCharset;if(!i){var D=false;C.onload=C.onreadystatechange=function(){if(!D&&(!this.readyState||this.readyState==="loaded"||this.readyState==="complete")){D=true;b();d();C.onload=C.onreadystatechange=null;B&&C.parentNode&&B.removeChild(C)}}}B.insertBefore(C,B.firstChild);return w}var F=false,x=e.xhr();if(x){e.username?x.open(n,e.url,e.async,e.username,e.password):x.open(n,e.url,e.async);try{if(e.data||a&&a.contentType)x.setRequestHeader("Content-Type",
++e.contentType);if(e.ifModified){c.lastModified[e.url]&&x.setRequestHeader("If-Modified-Since",c.lastModified[e.url]);c.etag[e.url]&&x.setRequestHeader("If-None-Match",c.etag[e.url])}t||x.setRequestHeader("X-Requested-With","XMLHttpRequest");x.setRequestHeader("Accept",e.dataType&&e.accepts[e.dataType]?e.accepts[e.dataType]+", */*":e.accepts._default)}catch(ia){}if(e.beforeSend&&e.beforeSend.call(p,x,e)===false){e.global&&!--c.active&&c.event.trigger("ajaxStop");x.abort();return false}e.global&&f("ajaxSend",
++[x,e]);var g=x.onreadystatechange=function(r){if(!x||x.readyState===0){F||d();F=true;if(x)x.onreadystatechange=c.noop}else if(!F&&x&&(x.readyState===4||r==="timeout")){F=true;x.onreadystatechange=c.noop;j=r==="timeout"?"timeout":!c.httpSuccess(x)?"error":e.ifModified&&c.httpNotModified(x,e.url)?"notmodified":"success";if(j==="success")try{o=c.httpData(x,e.dataType,e)}catch(q){j="parsererror"}if(j==="success"||j==="notmodified")i||b();else c.handleError(e,x,j);d();r==="timeout"&&x.abort();if(e.async)x=
++null}};try{var h=x.abort;x.abort=function(){if(x){h.call(x);if(x)x.readyState=0}g()}}catch(k){}e.async&&e.timeout>0&&setTimeout(function(){x&&!F&&g("timeout")},e.timeout);try{x.send(n==="POST"||n==="PUT"||n==="DELETE"?e.data:null)}catch(m){c.handleError(e,x,null,m);d()}e.async||g();return x}},handleError:function(a,b,d,f){if(a.error)a.error.call(a.context||A,b,d,f);if(a.global)(a.context?c(a.context):c.event).trigger("ajaxError",[b,a,f])},active:0,httpSuccess:function(a){try{return!a.status&&location.protocol===
++"file:"||a.status>=200&&a.status<300||a.status===304||a.status===1223||a.status===0}catch(b){}return false},httpNotModified:function(a,b){var d=a.getResponseHeader("Last-Modified"),f=a.getResponseHeader("Etag");if(d)c.lastModified[b]=d;if(f)c.etag[b]=f;return a.status===304||a.status===0},httpData:function(a,b,d){var f=a.getResponseHeader("content-type")||"",e=b==="xml"||!b&&f.indexOf("xml")>=0;a=e?a.responseXML:a.responseText;if(e&&a.documentElement.nodeName==="parsererror")throw"parsererror";if(d&&
++d.dataFilter)a=d.dataFilter(a,b);if(typeof a==="string")if(b==="json"||!b&&f.indexOf("json")>=0)if(/^[\],:{}\s]*$/.test(a.replace(/\\(?:["\\\/bfnrt]|u[0-9a-fA-F]{4})/g,"@").replace(/"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g,"]").replace(/(?:^|:|,)(?:\s*\[)+/g,"")))a=A.JSON&&A.JSON.parse?A.JSON.parse(a):(new Function("return "+a))();else throw"Invalid JSON: "+a;else if(b==="script"||!b&&f.indexOf("javascript")>=0)c.globalEval(a);return a},param:function(a,b){function d(e,i){i=
++c.isFunction(i)?i():i;f[f.length]=encodeURIComponent(e)+"="+encodeURIComponent(i)}var f=[];if(b===w)b=c.ajaxSettings.traditional;c.isArray(a)||a.jquery?c.each(a,function(){d(this.name,this.value)}):c.each(a,function e(i,j){if(c.isArray(j))c.each(j,function(o,p){b?d(i,p):e(i+"["+(typeof p==="object"||c.isArray(p)?o:"")+"]",p)});else!b&&j!=null&&typeof j==="object"?c.each(j,function(o,p){e(i+"["+o+"]",p)}):d(i,j)});return f.join("&").replace(wb,"+")}});var na={},xb=/toggle|show|hide/,yb=/^([+-]=)?([\d+-.]+)(.*)$/,
++Z,va=[["height","marginTop","marginBottom","paddingTop","paddingBottom"],["width","marginLeft","marginRight","paddingLeft","paddingRight"],["opacity"]];c.fn.extend({show:function(a,b){if(a!=null)return this.animate(L("show",3),a,b);else{a=0;for(b=this.length;a<b;a++){var d=c.data(this[a],"olddisplay");this[a].style.display=d||"";if(c.css(this[a],"display")==="none"){d=this[a].nodeName;var f;if(na[d])f=na[d];else{var e=c("<"+d+" />").appendTo("body");f=e.css("display");if(f==="none")f="block";e.remove();
++na[d]=f}c.data(this[a],"olddisplay",f)}}a=0;for(b=this.length;a<b;a++)this[a].style.display=c.data(this[a],"olddisplay")||"";return this}},hide:function(a,b){if(a!=null)return this.animate(L("hide",3),a,b);else{a=0;for(b=this.length;a<b;a++){var d=c.data(this[a],"olddisplay");!d&&d!=="none"&&c.data(this[a],"olddisplay",c.css(this[a],"display"))}a=0;for(b=this.length;a<b;a++)this[a].style.display="none";return this}},_toggle:c.fn.toggle,toggle:function(a,b){var d=typeof a==="boolean";if(c.isFunction(a)&&
++c.isFunction(b))this._toggle.apply(this,arguments);else a==null||d?this.each(function(){var f=d?a:c(this).is(":hidden");c(this)[f?"show":"hide"]()}):this.animate(L("toggle",3),a,b);return this},fadeTo:function(a,b,d){return this.filter(":hidden").css("opacity",0).show().end().animate({opacity:b},a,d)},animate:function(a,b,d,f){var e=c.speed(b,d,f);if(c.isEmptyObject(a))return this.each(e.complete);return this[e.queue===false?"each":"queue"](function(){var i=c.extend({},e),j,o=this.nodeType===1&&c(this).is(":hidden"),
++p=this;for(j in a){var n=j.replace(ka,la);if(j!==n){a[n]=a[j];delete a[j];j=n}if(a[j]==="hide"&&o||a[j]==="show"&&!o)return i.complete.call(this);if((j==="height"||j==="width")&&this.style){i.display=c.css(this,"display");i.overflow=this.style.overflow}if(c.isArray(a[j])){(i.specialEasing=i.specialEasing||{})[j]=a[j][1];a[j]=a[j][0]}}if(i.overflow!=null)this.style.overflow="hidden";i.curAnim=c.extend({},a);c.each(a,function(t,z){var B=new c.fx(p,i,t);if(xb.test(z))B[z==="toggle"?o?"show":"hide":z](a);
++else{var C=yb.exec(z),D=B.cur(true)||0;if(C){z=parseFloat(C[2]);var F=C[3]||"px";if(F!=="px"){p.style[t]=(z||1)+F;D=(z||1)/B.cur(true)*D;p.style[t]=D+F}if(C[1])z=(C[1]==="-="?-1:1)*z+D;B.custom(D,z,F)}else B.custom(D,z,"")}});return true})},stop:function(a,b){var d=c.timers;a&&this.queue([]);this.each(function(){for(var f=d.length-1;f>=0;f--)if(d[f].elem===this){b&&d[f](true);d.splice(f,1)}});b||this.dequeue();return this}});c.each({slideDown:L("show",1),slideUp:L("hide",1),slideToggle:L("toggle",
++1),fadeIn:{opacity:"show"},fadeOut:{opacity:"hide"}},function(a,b){c.fn[a]=function(d,f){return this.animate(b,d,f)}});c.extend({speed:function(a,b,d){var f=a&&typeof a==="object"?a:{complete:d||!d&&b||c.isFunction(a)&&a,duration:a,easing:d&&b||b&&!c.isFunction(b)&&b};f.duration=c.fx.off?0:typeof f.duration==="number"?f.duration:c.fx.speeds[f.duration]||c.fx.speeds._default;f.old=f.complete;f.complete=function(){f.queue!==false&&c(this).dequeue();c.isFunction(f.old)&&f.old.call(this)};return f},easing:{linear:function(a,
++b,d,f){return d+f*a},swing:function(a,b,d,f){return(-Math.cos(a*Math.PI)/2+0.5)*f+d}},timers:[],fx:function(a,b,d){this.options=b;this.elem=a;this.prop=d;if(!b.orig)b.orig={}}});c.fx.prototype={update:function(){this.options.step&&this.options.step.call(this.elem,this.now,this);(c.fx.step[this.prop]||c.fx.step._default)(this);if((this.prop==="height"||this.prop==="width")&&this.elem.style)this.elem.style.display="block"},cur:function(a){if(this.elem[this.prop]!=null&&(!this.elem.style||this.elem.style[this.prop]==
++null))return this.elem[this.prop];return(a=parseFloat(c.css(this.elem,this.prop,a)))&&a>-10000?a:parseFloat(c.curCSS(this.elem,this.prop))||0},custom:function(a,b,d){function f(i){return e.step(i)}this.startTime=K();this.start=a;this.end=b;this.unit=d||this.unit||"px";this.now=this.start;this.pos=this.state=0;var e=this;f.elem=this.elem;if(f()&&c.timers.push(f)&&!Z)Z=setInterval(c.fx.tick,13)},show:function(){this.options.orig[this.prop]=c.style(this.elem,this.prop);this.options.show=true;this.custom(this.prop===
++"width"||this.prop==="height"?1:0,this.cur());c(this.elem).show()},hide:function(){this.options.orig[this.prop]=c.style(this.elem,this.prop);this.options.hide=true;this.custom(this.cur(),0)},step:function(a){var b=K(),d=true;if(a||b>=this.options.duration+this.startTime){this.now=this.end;this.pos=this.state=1;this.update();this.options.curAnim[this.prop]=true;for(var f in this.options.curAnim)if(this.options.curAnim[f]!==true)d=false;if(d){if(this.options.display!=null){this.elem.style.overflow=
++this.options.overflow;a=c.data(this.elem,"olddisplay");this.elem.style.display=a?a:this.options.display;if(c.css(this.elem,"display")==="none")this.elem.style.display="block"}this.options.hide&&c(this.elem).hide();if(this.options.hide||this.options.show)for(var e in this.options.curAnim)c.style(this.elem,e,this.options.orig[e]);this.options.complete.call(this.elem)}return false}else{e=b-this.startTime;this.state=e/this.options.duration;a=this.options.easing||(c.easing.swing?"swing":"linear");this.pos=
++c.easing[this.options.specialEasing&&this.options.specialEasing[this.prop]||a](this.state,e,0,1,this.options.duration);this.now=this.start+(this.end-this.start)*this.pos;this.update()}return true}};c.extend(c.fx,{tick:function(){for(var a=c.timers,b=0;b<a.length;b++)a[b]()||a.splice(b--,1);a.length||c.fx.stop()},stop:function(){clearInterval(Z);Z=null},speeds:{slow:600,fast:200,_default:400},step:{opacity:function(a){c.style(a.elem,"opacity",a.now)},_default:function(a){if(a.elem.style&&a.elem.style[a.prop]!=
++null)a.elem.style[a.prop]=(a.prop==="width"||a.prop==="height"?Math.max(0,a.now):a.now)+a.unit;else a.elem[a.prop]=a.now}}});if(c.expr&&c.expr.filters)c.expr.filters.animated=function(a){return c.grep(c.timers,function(b){return a===b.elem}).length};c.fn.offset="getBoundingClientRect"in s.documentElement?function(a){var b=this[0];if(!b||!b.ownerDocument)return null;if(a)return this.each(function(e){c.offset.setOffset(this,a,e)});if(b===b.ownerDocument.body)return c.offset.bodyOffset(b);var d=b.getBoundingClientRect(),
++f=b.ownerDocument;b=f.body;f=f.documentElement;return{top:d.top+(self.pageYOffset||c.support.boxModel&&f.scrollTop||b.scrollTop)-(f.clientTop||b.clientTop||0),left:d.left+(self.pageXOffset||c.support.boxModel&&f.scrollLeft||b.scrollLeft)-(f.clientLeft||b.clientLeft||0)}}:function(a){var b=this[0];if(!b||!b.ownerDocument)return null;if(a)return this.each(function(t){c.offset.setOffset(this,a,t)});if(b===b.ownerDocument.body)return c.offset.bodyOffset(b);c.offset.initialize();var d=b.offsetParent,f=
++b,e=b.ownerDocument,i,j=e.documentElement,o=e.body;f=(e=e.defaultView)?e.getComputedStyle(b,null):b.currentStyle;for(var p=b.offsetTop,n=b.offsetLeft;(b=b.parentNode)&&b!==o&&b!==j;){if(c.offset.supportsFixedPosition&&f.position==="fixed")break;i=e?e.getComputedStyle(b,null):b.currentStyle;p-=b.scrollTop;n-=b.scrollLeft;if(b===d){p+=b.offsetTop;n+=b.offsetLeft;if(c.offset.doesNotAddBorder&&!(c.offset.doesAddBorderForTableAndCells&&/^t(able|d|h)$/i.test(b.nodeName))){p+=parseFloat(i.borderTopWidth)||
++0;n+=parseFloat(i.borderLeftWidth)||0}f=d;d=b.offsetParent}if(c.offset.subtractsBorderForOverflowNotVisible&&i.overflow!=="visible"){p+=parseFloat(i.borderTopWidth)||0;n+=parseFloat(i.borderLeftWidth)||0}f=i}if(f.position==="relative"||f.position==="static"){p+=o.offsetTop;n+=o.offsetLeft}if(c.offset.supportsFixedPosition&&f.position==="fixed"){p+=Math.max(j.scrollTop,o.scrollTop);n+=Math.max(j.scrollLeft,o.scrollLeft)}return{top:p,left:n}};c.offset={initialize:function(){var a=s.body,b=s.createElement("div"),
++d,f,e,i=parseFloat(c.curCSS(a,"marginTop",true))||0;c.extend(b.style,{position:"absolute",top:0,left:0,margin:0,border:0,width:"1px",height:"1px",visibility:"hidden"});b.innerHTML="<div style='position:absolute;top:0;left:0;margin:0;border:5px solid #000;padding:0;width:1px;height:1px;'><div></div></div><table style='position:absolute;top:0;left:0;margin:0;border:5px solid #000;padding:0;width:1px;height:1px;' cellpadding='0' cellspacing='0'><tr><td></td></tr></table>";a.insertBefore(b,a.firstChild);
++d=b.firstChild;f=d.firstChild;e=d.nextSibling.firstChild.firstChild;this.doesNotAddBorder=f.offsetTop!==5;this.doesAddBorderForTableAndCells=e.offsetTop===5;f.style.position="fixed";f.style.top="20px";this.supportsFixedPosition=f.offsetTop===20||f.offsetTop===15;f.style.position=f.style.top="";d.style.overflow="hidden";d.style.position="relative";this.subtractsBorderForOverflowNotVisible=f.offsetTop===-5;this.doesNotIncludeMarginInBodyOffset=a.offsetTop!==i;a.removeChild(b);c.offset.initialize=c.noop},
++bodyOffset:function(a){var b=a.offsetTop,d=a.offsetLeft;c.offset.initialize();if(c.offset.doesNotIncludeMarginInBodyOffset){b+=parseFloat(c.curCSS(a,"marginTop",true))||0;d+=parseFloat(c.curCSS(a,"marginLeft",true))||0}return{top:b,left:d}},setOffset:function(a,b,d){if(/static/.test(c.curCSS(a,"position")))a.style.position="relative";var f=c(a),e=f.offset(),i=parseInt(c.curCSS(a,"top",true),10)||0,j=parseInt(c.curCSS(a,"left",true),10)||0;if(c.isFunction(b))b=b.call(a,d,e);d={top:b.top-e.top+i,left:b.left-
++e.left+j};"using"in b?b.using.call(a,d):f.css(d)}};c.fn.extend({position:function(){if(!this[0])return null;var a=this[0],b=this.offsetParent(),d=this.offset(),f=/^body|html$/i.test(b[0].nodeName)?{top:0,left:0}:b.offset();d.top-=parseFloat(c.curCSS(a,"marginTop",true))||0;d.left-=parseFloat(c.curCSS(a,"marginLeft",true))||0;f.top+=parseFloat(c.curCSS(b[0],"borderTopWidth",true))||0;f.left+=parseFloat(c.curCSS(b[0],"borderLeftWidth",true))||0;return{top:d.top-f.top,left:d.left-f.left}},offsetParent:function(){return this.map(function(){for(var a=
++this.offsetParent||s.body;a&&!/^body|html$/i.test(a.nodeName)&&c.css(a,"position")==="static";)a=a.offsetParent;return a})}});c.each(["Left","Top"],function(a,b){var d="scroll"+b;c.fn[d]=function(f){var e=this[0],i;if(!e)return null;if(f!==w)return this.each(function(){if(i=wa(this))i.scrollTo(!a?f:c(i).scrollLeft(),a?f:c(i).scrollTop());else this[d]=f});else return(i=wa(e))?"pageXOffset"in i?i[a?"pageYOffset":"pageXOffset"]:c.support.boxModel&&i.document.documentElement[d]||i.document.body[d]:e[d]}});
++c.each(["Height","Width"],function(a,b){var d=b.toLowerCase();c.fn["inner"+b]=function(){return this[0]?c.css(this[0],d,false,"padding"):null};c.fn["outer"+b]=function(f){return this[0]?c.css(this[0],d,false,f?"margin":"border"):null};c.fn[d]=function(f){var e=this[0];if(!e)return f==null?null:this;return"scrollTo"in e&&e.document?e.document.compatMode==="CSS1Compat"&&e.document.documentElement["client"+b]||e.document.body["client"+b]:e.nodeType===9?Math.max(e.documentElement["client"+b],e.body["scroll"+
++b],e.documentElement["scroll"+b],e.body["offset"+b],e.documentElement["offset"+b]):f===w?c.css(e,d):this.css(d,typeof f==="string"?f:f+"px")}});A.jQuery=A.$=c})(window);
+diff --git a/sphinx/themes/conjunction/static/minus.png b/sphinx/themes/conjunction/static/minus.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..da1c5620d10c047525a467a425abe9ff5269cfc2
+GIT binary patch
+literal 199
+zc%17D@N?(olHy`uVBq!ia0vp^+#t-s1SHkYJtzcHoCO|{#XvD(5N2eUHAey{$X?><
+z>&kweokM_|(Po{+Q=kw>iEBiObAE1aYF-J$w=>iB1I2<oT^vIsE+^X*KjUGJJ8<a0
+zfdz{eHHE&rzrX(bySvGUL|lavlN4AuRwpzDOq(`sMv;5Joa+jUx<3|oWPN;mPUJ0`
+pW__Wi<5+59Lc)&n_i}Q^3>R$WLpMkF=>bh=@O1TaS?83{1OVknK<NMg
+
+diff --git a/sphinx/themes/conjunction/static/plus.png b/sphinx/themes/conjunction/static/plus.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..b3cb37425ea68b39ffa7b2e5fb69161275a87541
+GIT binary patch
+literal 199
+zc%17D@N?(olHy`uVBq!ia0vp^+#t-s1SHkYJtzcHoCO|{#XvD(5N2eUHAey{$X?><
+z>&kweokM`jkU7Va11Q8%;u=xnoS&PUnpeW`?aZ|OK(QcC7sn8Z%gHvy&v=;Q4jejg
+zV8NnAO`-4Z@2~&<?ryS^@YXF`T!a&o6j(S`Cmb}9IcHb(MZ@Xn$H&JXUMl#uzyAM<
+o7knL=1-mEi3=josIGoJJAh%tCVFz!`HlXPYp00i_>zopr02WF_WB>pF
+
+diff --git a/sphinx/themes/conjunction/static/searchtools.js b/sphinx/themes/conjunction/static/searchtools.js
+new file mode 100644
+--- /dev/null
++++ b/sphinx/themes/conjunction/static/searchtools.js
+@@ -0,0 +1,501 @@
++/*
++ * searchtools.js
++ * ~~~~~~~~~~~~~~
++ *
++ * Sphinx JavaScript utilties for the full-text search.
++ *
++ * :copyright: Copyright 2007-2010 by the Sphinx team, see AUTHORS.
++ * :license: BSD, see LICENSE for details.
++ *
++ */
++
++/**
++ * helper function to return a node containing the
++ * search summary for a given text. keywords is a list
++ * of stemmed words, hlwords is the list of normal, unstemmed
++ * words. the first one is used to find the occurance, the
++ * latter for highlighting it.
++ */
++
++jQuery.makeSearchSummary = function(text, keywords, hlwords) {
++  var textLower = text.toLowerCase();
++  var start = 0;
++  $.each(keywords, function() {
++    var i = textLower.indexOf(this.toLowerCase());
++    if (i > -1)
++      start = i;
++  });
++  start = Math.max(start - 120, 0);
++  var excerpt = ((start > 0) ? '...' : '') +
++  $.trim(text.substr(start, 240)) +
++  ((start + 240 - text.length) ? '...' : '');
++  var rv = $('<div class="context"></div>').text(excerpt);
++  $.each(hlwords, function() {
++    rv = rv.highlightText(this, 'highlighted');
++  });
++  return rv;
++}
++
++/**
++ * Porter Stemmer
++ */
++var PorterStemmer = function() {
++
++  var step2list = {
++    ational: 'ate',
++    tional: 'tion',
++    enci: 'ence',
++    anci: 'ance',
++    izer: 'ize',
++    bli: 'ble',
++    alli: 'al',
++    entli: 'ent',
++    eli: 'e',
++    ousli: 'ous',
++    ization: 'ize',
++    ation: 'ate',
++    ator: 'ate',
++    alism: 'al',
++    iveness: 'ive',
++    fulness: 'ful',
++    ousness: 'ous',
++    aliti: 'al',
++    iviti: 'ive',
++    biliti: 'ble',
++    logi: 'log'
++  };
++
++  var step3list = {
++    icate: 'ic',
++    ative: '',
++    alize: 'al',
++    iciti: 'ic',
++    ical: 'ic',
++    ful: '',
++    ness: ''
++  };
++
++  var c = "[^aeiou]";          // consonant
++  var v = "[aeiouy]";          // vowel
++  var C = c + "[^aeiouy]*";    // consonant sequence
++  var V = v + "[aeiou]*";      // vowel sequence
++
++  var mgr0 = "^(" + C + ")?" + V + C;                      // [C]VC... is m>0
++  var meq1 = "^(" + C + ")?" + V + C + "(" + V + ")?$";    // [C]VC[V] is m=1
++  var mgr1 = "^(" + C + ")?" + V + C + V + C;              // [C]VCVC... is m>1
++  var s_v   = "^(" + C + ")?" + v;                         // vowel in stem
++
++  this.stemWord = function (w) {
++    var stem;
++    var suffix;
++    var firstch;
++    var origword = w;
++
++    if (w.length < 3)
++      return w;
++
++    var re;
++    var re2;
++    var re3;
++    var re4;
++
++    firstch = w.substr(0,1);
++    if (firstch == "y")
++      w = firstch.toUpperCase() + w.substr(1);
++
++    // Step 1a
++    re = /^(.+?)(ss|i)es$/;
++    re2 = /^(.+?)([^s])s$/;
++
++    if (re.test(w))
++      w = w.replace(re,"$1$2");
++    else if (re2.test(w))
++      w = w.replace(re2,"$1$2");
++
++    // Step 1b
++    re = /^(.+?)eed$/;
++    re2 = /^(.+?)(ed|ing)$/;
++    if (re.test(w)) {
++      var fp = re.exec(w);
++      re = new RegExp(mgr0);
++      if (re.test(fp[1])) {
++        re = /.$/;
++        w = w.replace(re,"");
++      }
++    }
++    else if (re2.test(w)) {
++      var fp = re2.exec(w);
++      stem = fp[1];
++      re2 = new RegExp(s_v);
++      if (re2.test(stem)) {
++        w = stem;
++        re2 = /(at|bl|iz)$/;
++        re3 = new RegExp("([^aeiouylsz])\\1$");
++        re4 = new RegExp("^" + C + v + "[^aeiouwxy]$");
++        if (re2.test(w))
++          w = w + "e";
++        else if (re3.test(w)) {
++          re = /.$/;
++          w = w.replace(re,"");
++        }
++        else if (re4.test(w))
++          w = w + "e";
++      }
++    }
++
++    // Step 1c
++    re = /^(.+?)y$/;
++    if (re.test(w)) {
++      var fp = re.exec(w);
++      stem = fp[1];
++      re = new RegExp(s_v);
++      if (re.test(stem))
++        w = stem + "i";
++    }
++
++    // Step 2
++    re = /^(.+?)(ational|tional|enci|anci|izer|bli|alli|entli|eli|ousli|ization|ation|ator|alism|iveness|fulness|ousness|aliti|iviti|biliti|logi)$/;
++    if (re.test(w)) {
++      var fp = re.exec(w);
++      stem = fp[1];
++      suffix = fp[2];
++      re = new RegExp(mgr0);
++      if (re.test(stem))
++        w = stem + step2list[suffix];
++    }
++
++    // Step 3
++    re = /^(.+?)(icate|ative|alize|iciti|ical|ful|ness)$/;
++    if (re.test(w)) {
++      var fp = re.exec(w);
++      stem = fp[1];
++      suffix = fp[2];
++      re = new RegExp(mgr0);
++      if (re.test(stem))
++        w = stem + step3list[suffix];
++    }
++
++    // Step 4
++    re = /^(.+?)(al|ance|ence|er|ic|able|ible|ant|ement|ment|ent|ou|ism|ate|iti|ous|ive|ize)$/;
++    re2 = /^(.+?)(s|t)(ion)$/;
++    if (re.test(w)) {
++      var fp = re.exec(w);
++      stem = fp[1];
++      re = new RegExp(mgr1);
++      if (re.test(stem))
++        w = stem;
++    }
++    else if (re2.test(w)) {
++      var fp = re2.exec(w);
++      stem = fp[1] + fp[2];
++      re2 = new RegExp(mgr1);
++      if (re2.test(stem))
++        w = stem;
++    }
++
++    // Step 5
++    re = /^(.+?)e$/;
++    if (re.test(w)) {
++      var fp = re.exec(w);
++      stem = fp[1];
++      re = new RegExp(mgr1);
++      re2 = new RegExp(meq1);
++      re3 = new RegExp("^" + C + v + "[^aeiouwxy]$");
++      if (re.test(stem) || (re2.test(stem) && !(re3.test(stem))))
++        w = stem;
++    }
++    re = /ll$/;
++    re2 = new RegExp(mgr1);
++    if (re.test(w) && re2.test(w)) {
++      re = /.$/;
++      w = w.replace(re,"");
++    }
++
++    // and turn initial Y back to y
++    if (firstch == "y")
++      w = firstch.toLowerCase() + w.substr(1);
++    return w;
++  }
++}
++
++
++/**
++ * Search Module
++ */
++var Search = {
++
++  _index : null,
++  _queued_query : null,
++  _pulse_status : -1,
++
++  init : function() {
++      var params = $.getQueryParameters();
++      if (params.q) {
++          var query = params.q[0];
++          $('input[name="q"]')[0].value = query;
++          this.performSearch(query);
++      }
++  },
++
++  /**
++   * Sets the index
++   */
++  setIndex : function(index) {
++    var q;
++    this._index = index;
++    if ((q = this._queued_query) !== null) {
++      this._queued_query = null;
++      Search.query(q);
++    }
++  },
++
++  hasIndex : function() {
++      return this._index !== null;
++  },
++
++  deferQuery : function(query) {
++      this._queued_query = query;
++  },
++
++  stopPulse : function() {
++      this._pulse_status = 0;
++  },
++
++  startPulse : function() {
++    if (this._pulse_status >= 0)
++        return;
++    function pulse() {
++      Search._pulse_status = (Search._pulse_status + 1) % 4;
++      var dotString = '';
++      for (var i = 0; i < Search._pulse_status; i++)
++        dotString += '.';
++      Search.dots.text(dotString);
++      if (Search._pulse_status > -1)
++        window.setTimeout(pulse, 500);
++    };
++    pulse();
++  },
++
++  /**
++   * perform a search for something
++   */
++  performSearch : function(query) {
++    // create the required interface elements
++    this.out = $('#search-results');
++    this.title = $('<h2>' + _('Searching') + '</h2>').appendTo(this.out);
++    this.dots = $('<span></span>').appendTo(this.title);
++    this.status = $('<p style="display: none"></p>').appendTo(this.out);
++    this.output = $('<ul class="search"/>').appendTo(this.out);
++
++    $('#search-progress').text(_('Preparing search...'));
++    this.startPulse();
++
++    // index already loaded, the browser was quick!
++    if (this.hasIndex())
++      this.query(query);
++    else
++      this.deferQuery(query);
++  },
++
++  query : function(query) {
++    var stopwords = ['and', 'then', 'into', 'it', 'as', 'are', 'in',
++                     'if', 'for', 'no', 'there', 'their', 'was', 'is',
++                     'be', 'to', 'that', 'but', 'they', 'not', 'such',
++                     'with', 'by', 'a', 'on', 'these', 'of', 'will',
++                     'this', 'near', 'the', 'or', 'at'];
++
++    // stem the searchterms and add them to the correct list
++    var stemmer = new PorterStemmer();
++    var searchterms = [];
++    var excluded = [];
++    var hlterms = [];
++    var tmp = query.split(/\s+/);
++    var object = (tmp.length == 1) ? tmp[0].toLowerCase() : null;
++    for (var i = 0; i < tmp.length; i++) {
++      if ($u.indexOf(stopwords, tmp[i]) != -1 || tmp[i].match(/^\d+$/) ||
++          tmp[i] == "") {
++        // skip this "word"
++        continue;
++      }
++      // stem the word
++      var word = stemmer.stemWord(tmp[i]).toLowerCase();
++      // select the correct list
++      if (word[0] == '-') {
++        var toAppend = excluded;
++        word = word.substr(1);
++      }
++      else {
++        var toAppend = searchterms;
++        hlterms.push(tmp[i].toLowerCase());
++      }
++      // only add if not already in the list
++      if (!$.contains(toAppend, word))
++        toAppend.push(word);
++    };
++    var highlightstring = '?highlight=' + $.urlencode(hlterms.join(" "));
++
++    // console.debug('SEARCH: searching for:');
++    // console.info('required: ', searchterms);
++    // console.info('excluded: ', excluded);
++
++    // prepare search
++    var filenames = this._index.filenames;
++    var titles = this._index.titles;
++    var terms = this._index.terms;
++    var objects = this._index.objects;
++    var objtypes = this._index.objtypes;
++    var objnames = this._index.objnames;
++    var fileMap = {};
++    var files = null;
++    // different result priorities
++    var importantResults = [];
++    var objectResults = [];
++    var regularResults = [];
++    var unimportantResults = [];
++    $('#search-progress').empty();
++
++    // lookup as object
++    if (object != null) {
++      for (var prefix in objects) {
++        for (var name in objects[prefix]) {
++          var fullname = (prefix ? prefix + '.' : '') + name;
++          if (fullname.toLowerCase().indexOf(object) > -1) {
++            match = objects[prefix][name];
++            descr = objnames[match[1]] + _(', in ') + titles[match[0]];
++            // XXX the generated anchors are not generally correct
++            // XXX there may be custom prefixes
++            result = [filenames[match[0]], fullname, '#'+fullname, descr];
++            switch (match[2]) {
++            case 1: objectResults.push(result); break;
++            case 0: importantResults.push(result); break;
++            case 2: unimportantResults.push(result); break;
++            }
++          }
++        }
++      }
++    }
++
++    // sort results descending
++    objectResults.sort(function(a, b) {
++      return (a[1] > b[1]) ? -1 : ((a[1] < b[1]) ? 1 : 0);
++    });
++
++    importantResults.sort(function(a, b) {
++      return (a[1] > b[1]) ? -1 : ((a[1] < b[1]) ? 1 : 0);
++    });
++
++    unimportantResults.sort(function(a, b) {
++      return (a[1] > b[1]) ? -1 : ((a[1] < b[1]) ? 1 : 0);
++    });
++
++
++    // perform the search on the required terms
++    for (var i = 0; i < searchterms.length; i++) {
++      var word = searchterms[i];
++      // no match but word was a required one
++      if ((files = terms[word]) == null)
++        break;
++      if (files.length == undefined) {
++        files = [files];
++      }
++      // create the mapping
++      for (var j = 0; j < files.length; j++) {
++        var file = files[j];
++        if (file in fileMap)
++          fileMap[file].push(word);
++        else
++          fileMap[file] = [word];
++      }
++    }
++
++    // now check if the files don't contain excluded terms
++    for (var file in fileMap) {
++      var valid = true;
++
++      // check if all requirements are matched
++      if (fileMap[file].length != searchterms.length)
++        continue;
++
++      // ensure that none of the excluded terms is in the
++      // search result.
++      for (var i = 0; i < excluded.length; i++) {
++        if (terms[excluded[i]] == file ||
++            $.contains(terms[excluded[i]] || [], file)) {
++          valid = false;
++          break;
++        }
++      }
++
++      // if we have still a valid result we can add it
++      // to the result list
++      if (valid)
++        regularResults.push([filenames[file], titles[file], '', null]);
++    }
++
++    // delete unused variables in order to not waste
++    // memory until list is retrieved completely
++    delete filenames, titles, terms;
++
++    // now sort the regular results descending by title
++    regularResults.sort(function(a, b) {
++      var left = a[1].toLowerCase();
++      var right = b[1].toLowerCase();
++      return (left > right) ? -1 : ((left < right) ? 1 : 0);
++    });
++
++    // combine all results
++    var results = unimportantResults.concat(regularResults)
++      .concat(objectResults).concat(importantResults);
++
++    // print the results
++    var resultCount = results.length;
++    function displayNextItem() {
++      // results left, load the summary and display it
++      if (results.length) {
++        var item = results.pop();
++        var listItem = $('<li style="display:none"></li>');
++        listItem.append($('<a/>').attr(
++          'href',
++          item[0] + DOCUMENTATION_OPTIONS.FILE_SUFFIX +
++          highlightstring + item[2]).html(item[1]));
++        if (item[3]) {
++          listItem.append($('<span> (' + item[3] + ')</span>'));
++          Search.output.append(listItem);
++          listItem.slideDown(5, function() {
++            displayNextItem();
++          });
++        } else if (DOCUMENTATION_OPTIONS.HAS_SOURCE) {
++          $.get(DOCUMENTATION_OPTIONS.URL_ROOT + '_sources/' +
++                item[0] + '.txt', function(data) {
++            listItem.append($.makeSearchSummary(data, searchterms, hlterms));
++            Search.output.append(listItem);
++            listItem.slideDown(5, function() {
++              displayNextItem();
++            });
++          });
++        } else {
++          // no source available, just display title
++          Search.output.append(listItem);
++          listItem.slideDown(5, function() {
++            displayNextItem();
++          });
++        }
++      }
++      // search finished, update title and status message
++      else {
++        Search.stopPulse();
++        Search.title.text(_('Search Results'));
++        if (!resultCount)
++          Search.status.text(_('Your search did not match any documents. Please make sure that all words are spelled correctly and that you\'ve selected enough categories.'));
++        else
++            Search.status.text(_('Search finished, found %s page(s) matching the search query.').replace('%s', resultCount));
++        Search.status.fadeIn(500);
++      }
++    }
++    displayNextItem();
++  }
++}
++
++$(document).ready(function() {
++  Search.init();
++});
+diff --git a/sphinx/themes/conjunction/static/style.css b/sphinx/themes/conjunction/static/style.css
+new file mode 100644
+--- /dev/null
++++ b/sphinx/themes/conjunction/static/style.css
+@@ -0,0 +1,927 @@
++
++/*
++Design by Free CSS Templates
++http://www.freecsstemplates.org
++Released for free under a Creative Commons Attribution 2.5 License
++*/
++
++/*
++ * basic.css
++ * ~~~~~~~~~
++ *
++ * Sphinx stylesheet -- basic theme.
++ *
++ * :copyright: Copyright 2007-2010 by the Sphinx team, see AUTHORS.
++ * :license: BSD, see LICENSE for details.
++ *
++ */
++
++/* -- main layout ----------------------------------------------------------- */
++
++div.clearer {
++    clear: both;
++}
++
++/* -- relbar ---------------------------------------------------------------- */
++
++div.related {
++    width: 100%;
++    font-size: 90%;
++}
++
++div.related h3 {
++    display: none;
++}
++
++div.related ul {
++    margin: 0;
++    padding: 0px;
++    list-style: none;
++}
++
++div.related li {
++    display: inline;
++}
++
++div.related li.right {
++    float: right;
++    margin-right: 5px;
++}
++
++/* -- sidebar --------------------------------------------------------------- */
++
++div.sphinxsidebarwrapper {
++    padding: 10px 5px 0 10px;
++}
++
++div.sphinxsidebar {
++    float: left;
++    width: 230px;
++    margin-left: -100%;
++    font-size: 90%;
++}
++
++div.sphinxsidebar ul {
++    list-style: none;
++}
++
++div.sphinxsidebar ul ul,
++div.sphinxsidebar ul.want-points {
++    margin-left: 20px;
++    list-style: square;
++}
++
++div.sphinxsidebar ul ul {
++    margin-top: 0;
++    margin-bottom: 0;
++}
++
++div.sphinxsidebar form {
++    margin-top: 10px;
++}
++
++div.sphinxsidebar input {
++    border: 1px solid #98dbcc;
++    font-family: sans-serif;
++    font-size: 1em;
++}
++
++img {
++    border: 0;
++}
++
++/* -- search page ----------------------------------------------------------- */
++
++ul.search {
++    margin: 10px 0 0 20px;
++    padding: 0;
++}
++
++ul.search li {
++    padding: 5px 0 5px 20px;
++    background-image: url(file.png);
++    background-repeat: no-repeat;
++    background-position: 0 7px;
++}
++
++ul.search li a {
++    font-weight: bold;
++}
++
++ul.search li div.context {
++    color: #888;
++    margin: 2px 0 0 30px;
++    text-align: left;
++}
++
++ul.keywordmatches li.goodmatch a {
++    font-weight: bold;
++}
++
++/* -- index page ------------------------------------------------------------ */
++
++table.contentstable {
++    width: 90%;
++}
++
++table.contentstable p.biglink {
++    line-height: 150%;
++}
++
++a.biglink {
++    font-size: 1.3em;
++}
++
++span.linkdescr {
++    font-style: italic;
++    padding-top: 5px;
++    font-size: 90%;
++}
++
++/* -- general index --------------------------------------------------------- */
++
++table.indextable {
++    width: 100%;
++}
++
++table.indextable td {
++    text-align: left;
++    vertical-align: top;
++}
++
++table.indextable dl, table.indextable dd {
++    margin-top: 0;
++    margin-bottom: 0;
++}
++
++table.indextable tr.pcap {
++    height: 10px;
++}
++
++table.indextable tr.cap {
++    margin-top: 10px;
++    background-color: #f2f2f2;
++}
++
++img.toggler {
++    margin-right: 3px;
++    margin-top: 3px;
++    cursor: pointer;
++}
++
++div.modindex-jumpbox {
++    border-top: 1px solid #ddd;
++    border-bottom: 1px solid #ddd;
++    margin: 1em 0 1em 0;
++    padding: 0.4em;
++}
++
++div.genindex-jumpbox {
++    border-top: 1px solid #ddd;
++    border-bottom: 1px solid #ddd;
++    margin: 1em 0 1em 0;
++    padding: 0.4em;
++}
++
++/* -- general body styles --------------------------------------------------- */
++
++a.headerlink {
++    visibility: hidden;
++}
++
++h1:hover > a.headerlink,
++h2:hover > a.headerlink,
++h3:hover > a.headerlink,
++h4:hover > a.headerlink,
++h5:hover > a.headerlink,
++h6:hover > a.headerlink,
++dt:hover > a.headerlink {
++    visibility: visible;
++}
++
++div.body p.caption {
++    text-align: inherit;
++}
++
++div.body td {
++    text-align: left;
++}
++
++.field-list ul {
++    padding-left: 1em;
++}
++
++.first {
++    margin-top: 0 !important;
++}
++
++p.rubric {
++    margin-top: 30px;
++    font-weight: bold;
++}
++
++/* -- sidebars -------------------------------------------------------------- */
++
++div.sidebar {
++    margin: 0 0 0.5em 1em;
++    border: 1px solid #ddb;
++    padding: 7px 7px 0 7px;
++    background-color: #ffe;
++    width: 40%;
++    float: right;
++}
++
++p.sidebar-title {
++    font-weight: bold;
++}
++
++/* -- topics ---------------------------------------------------------------- */
++
++div.topic {
++    border: 1px solid #ccc;
++    padding: 7px 7px 0 7px;
++    margin: 10px 0 10px 0;
++}
++
++p.topic-title {
++    font-size: 1.1em;
++    font-weight: bold;
++    margin-top: 10px;
++}
++
++/* -- admonitions ----------------------------------------------------------- */
++
++div.admonition {
++    margin-top: 10px;
++    margin-bottom: 10px;
++    padding: 7px;
++}
++
++div.admonition dt {
++    font-weight: bold;
++}
++
++div.admonition dl {
++    margin-bottom: 0;
++}
++
++p.admonition-title {
++    margin: 0px 10px 5px 0px;
++    font-weight: bold;
++}
++
++div.body p.centered {
++    text-align: center;
++    margin-top: 25px;
++}
++
++/* -- tables ---------------------------------------------------------------- */
++
++table.docutils {
++    border: 0;
++    border-collapse: collapse;
++}
++
++table.docutils td, table.docutils th {
++    padding: 1px 8px 1px 5px;
++    border-top: 0;
++    border-left: 0;
++    border-right: 0;
++    border-bottom: 1px solid #aaa;
++}
++
++table.field-list td, table.field-list th {
++    border: 0 !important;
++}
++
++table.footnote td, table.footnote th {
++    border: 0 !important;
++}
++
++th {
++    text-align: left;
++    padding-right: 5px;
++}
++
++/* -- other body styles ----------------------------------------------------- */
++
++dl {
++    margin-bottom: 15px;
++}
++
++dd p {
++    margin-top: 0px;
++}
++
++dd ul, dd table {
++    margin-bottom: 10px;
++}
++
++dd {
++    margin-top: 3px;
++    margin-bottom: 10px;
++    margin-left: 30px;
++}
++
++dt:target, .highlighted {
++    background-color: #fbe54e;
++}
++
++dl.glossary dt {
++    font-weight: bold;
++    font-size: 1.1em;
++}
++
++.field-list ul {
++    margin: 0;
++    padding-left: 1em;
++}
++
++.field-list p {
++    margin: 0;
++}
++
++.refcount {
++    color: #060;
++}
++
++.optional {
++    font-size: 1.3em;
++}
++
++.versionmodified {
++    font-style: italic;
++}
++
++.system-message {
++    background-color: #fda;
++    padding: 5px;
++    border: 3px solid red;
++}
++
++.footnote:target  {
++    background-color: #ffa
++}
++
++.line-block {
++    display: block;
++    margin-top: 1em;
++    margin-bottom: 1em;
++}
++
++.line-block .line-block {
++    margin-top: 0;
++    margin-bottom: 0;
++    margin-left: 1.5em;
++}
++
++/* -- code displays --------------------------------------------------------- */
++
++pre {
++    overflow: auto;
++}
++
++td.linenos pre {
++    padding: 5px 0px;
++    border: 0;
++    background-color: transparent;
++    color: #aaa;
++}
++
++table.highlighttable {
++    margin-left: 0.5em;
++}
++
++table.highlighttable td {
++    padding: 0 0.5em 0 0.5em;
++}
++
++tt.descname {
++    background-color: transparent;
++    font-weight: bold;
++    font-size: 1.2em;
++}
++
++tt.descclassname {
++    background-color: transparent;
++}
++
++tt.xref, a tt {
++    background-color: transparent;
++    font-weight: bold;
++}
++
++h1 tt, h2 tt, h3 tt, h4 tt, h5 tt, h6 tt {
++    background-color: transparent;
++}
++
++.viewcode-link {
++    float: right;
++}
++
++.viewcode-back {
++    float: right;
++    font-family: sans-serif;
++}
++
++div.viewcode-block:target {
++    margin: -1px -10px;
++    padding: 0 10px;
++}
++
++/* -- math display ---------------------------------------------------------- */
++
++img.math {
++    vertical-align: middle;
++}
++
++div.body div.math p {
++    text-align: center;
++}
++
++span.eqno {
++    float: right;
++}
++
++/* -- printout stylesheet --------------------------------------------------- */
++
++@media print {
++    div.document {
++        margin: 0 !important;
++        width: 100%;
++    }
++
++    div.sphinxsidebar,
++    div.related,
++    div.footer,
++    #top-link {
++        display: none;
++    }
++}
++
++body {
++    margin: 0px;
++    padding: 0;
++    background: #B9B99D url(images/img01.jpg) repeat-x left top;
++    font-family: Georgia, "Times New Roman", Times, serif;
++    font-size: 12px;
++    color: #464646;
++}
++
++h1, h2, h3 {
++    margin: 0;
++    font-weight: normal;
++    color: #f49900;
++}
++
++h1 { font-size: 44px; }
++
++h2 { font-size: 18px; }
++
++h3 { }
++
++p, ul, ol {
++    margin: 5px 0px;
++    line-height: 240%;
++    text-align: justify;
++}
++
++ul, ol { }
++
++blockquote { }
++
++a { color: #98CA2E; }
++
++a:hover { text-decoration: none; }
++
++a img {
++    border: none;
++}
++
++img.left {
++    float: left;
++    margin: 7px 30px 0 0;
++}
++
++img.right {
++    float: right;
++    margin: 7px 0 0 30px;
++}
++
++hr { display: none; }
++
++.list1 {
++}
++
++.list1 li {
++    float: left;
++    line-height: normal;
++}
++
++.list1 li img {
++    margin: 0 30px 30px 0;
++}
++
++.list1 li.alt img {
++    margin-right: 0;
++}
++
++#wrapper {
++}
++
++/* Header */
++
++#header-wrapper {
++}
++
++#header {
++    width: 980px;
++    height: 60px;
++    margin: 0 auto;
++    padding: 0px;
++}
++
++/** LOGO */
++
++#logo {
++    width: 940px;
++    height: 110px;
++    margin: 0 auto;
++    padding: 30px 20px 0px 20px;
++}
++
++#logo h1, #logo p {
++    margin: 0px;
++    line-height: normal;
++    text-transform: lowercase;
++    font-weight: normal;
++    color: #FFFFFF;
++}
++
++#logo p {
++    margin-top: -4px;
++    text-transform: lowercase;
++    font-size: 13px;
++    color: #F6F9FB;
++}
++
++#logo h1 {
++    font-size: 48px;
++}
++
++#logo a {
++    text-decoration: none;
++    color: #F6F9FB;
++}
++
++#logo h1 a {
++    text-decoration: none;
++    color: #FFFFFF;
++}
++
++/* Menu */
++
++#menu {
++    float: left;
++    width: 600px;
++    height: 60px;
++}
++
++#menu ul {
++    margin: 0;
++    padding: 0px;
++    list-style: none;
++    line-height: normal;
++}
++
++#menu li {
++    display: block;
++    float: left;
++}
++
++#menu a {
++    display: block;
++    float: left;
++    height: 32px;
++    padding: 12px 20px 0px 20px;
++    letter-spacing: -1px;
++    text-decoration: none;
++    text-align: center;
++    text-transform: lowercase;
++    font-family: Arial, Helvetica, sans-serif;
++    font-size: 18px;
++    font-weight: normal;
++    color: #FFFFFF;
++}
++
++#menu a:hover { 
++    text-decoration: none; 
++}
++
++#menu .current_page_item a {
++}
++
++#menu .first {
++}
++/* Search */
++
++#search {
++    float: right;
++    width: 240px;
++    padding: 10px 20px 0px 0px;
++}
++
++#search form {
++    float: right;
++    margin: 0;
++    padding: 4px 0px 0 0;
++}
++
++#search fieldset {
++    margin: 0;
++    padding: 0;
++    border: none;
++}
++
++#search input {
++    float: left;
++    font: 12px Georgia, "Times New Roman", Times, serif;
++}
++
++#search-text {
++    width: 150px;
++    height: 18px;
++    padding: 3px 0 0 5px;
++    border: none;
++    background: #EFEFDF;
++    color: #888;
++}
++
++#search-submit {
++    height: 21px;
++    margin-left: 10px;
++    padding: 0px 5px;
++    background: #98CA2E;
++    border: none;
++    color: #FFFFFF;
++}
++
++/* Page */
++
++#page {
++    width: 940px;
++    margin: 0 auto;
++    padding: 20px 20px 0px 20px;
++}
++
++#banner {
++    padding-bottom: 20px;
++}
++
++/* Content */
++
++#content {
++    float: left;
++    width: 620px;
++    width: 580px;
++}
++
++/* Post */
++
++.post {
++    width: 620px;
++    margin-bottom: 20px;
++    padding: 20px;
++    background: #FFFFFF;
++}
++
++.post .title {
++    height: 44px;
++    padding: 0px 20px;
++    font-family: Georgia, "Times New Roman", Times, serif;
++}
++
++.post .title a {
++    letter-spacing: -1px;
++    text-decoration: none;
++    text-transform: lowercase;
++    font-size: 30px;
++    color: #238EC6;
++}
++
++.post .date {
++}
++
++.post h1 {
++    height: 32px;
++    margin-top: -10px;
++    margin-left: 2px;
++    padding: 4px 0px 20px 0px;
++    background: url(images/img04.jpg) no-repeat left bottom;
++    font-weight: normal;
++    color: #238EC6;
++}
++
++.post .meta span {
++    display: block;
++    margin-top: -10px;
++}
++
++.post .meta a { }
++
++.post .entry {
++    padding: 10px 20px;
++}
++
++.post .links {
++    background: #90BF35;
++    border: 1px solid #5F817E;
++}
++
++.post .links {
++    display: block;
++    width: 120px;
++    height: 18px;
++    margin: 0px 0px 4px 0px; 
++    padding: 3px 0px 0px 40px;
++    text-decoration: none;
++    font-family: Arial, Helvetica, sans-serif;
++    font-size: 11px;
++    text-decoration: none;
++    font-weight: bold;
++    color: #FFFFFF;
++}
++
++.post .comments {
++    display: block;
++    width: 120px;
++    height: 18px;
++    margin: 0px; 
++    padding: 3px 0px 0px 40px;
++    background: #90BF35;
++    border: 1px solid #5F817E;
++    text-decoration: none;
++    font-family: Arial, Helvetica, sans-serif;
++    font-size: 11px;
++    text-decoration: none;
++    font-weight: bold;
++    color: #FFFFFF;
++}
++
++/* Sidebar */
++
++#sidebar {
++    float: right;
++    width: 280px;
++    font-size: 12px;
++}
++
++#sidebar ul {
++    margin: 0;
++    padding: 0;
++    list-style: none;
++    line-height: normal;
++    border: none;
++}
++
++#sidebar li {
++    margin-bottom: 20px;
++    padding: 10px 0px 10px 0px;
++    background: #FFFFFF;
++}
++
++#sidebar li ul {
++    margin: 0px 0px;
++    border: none;
++}
++
++#sidebar li li {
++    margin: 0;
++    padding: 10px 0px;
++    border: none;
++    background: url(images/img06.jpg) repeat-x left bottom;
++}
++
++#sidebar li li a {
++    padding: 0px 0px 0px 30px;
++    font-weight: normal;
++    border: none;
++    background: url(images/img07.jpg) no-repeat 15px 4px;
++}
++
++#sidebar li li a:hover {
++    color: #666666;
++}
++
++#sidebar p {
++    margin: 0;
++    padding: 0px 14px;
++}
++
++#sidebar h2 {
++    height: 32px;
++    margin: 0 0 10px 0px;
++    padding: 8px 0 10px 20px;
++    background: url(images/img03.jpg) no-repeat left bottom;
++    text-transform: lowercase;
++    font-size: 24px;
++    font-weight: normal;
++    color: #238EC6;
++}
++
++
++#sidebar p {
++    line-height: 200%;
++}
++
++#sidebar a {
++    text-align: left;
++    text-decoration: none;
++    font-weight: bold;
++    color: #666666;
++}
++
++/* Calendar */
++
++#calendar {
++}
++
++#calendar caption {
++    padding-bottom: 5px;
++    font-weight: bold;
++}
++
++#calendar table {
++    width: 100%;
++    border-collapse: collapse;
++    border-bottom: 1px solid #24130F;
++    border-left: 1px solid #24130F;
++    border-right: 1px solid #24130F;
++}
++
++#calendar thead th {
++    padding: 5px 0;
++    text-align: center;
++    border-top: 1px solid #24130F;
++    border-left: 1px solid #24130F;
++    background: #24130F;
++}
++
++#calendar tbody td {
++    padding: 5px 0;
++    text-align: center;
++    border-top: 1px solid #24130F;
++    border-left: 1px solid #24130F;
++    border-bottom: 1px solid #24130F;
++}
++
++#calendar tfoot td {
++    padding: 5px;
++    border-left: 1px solid #24130F;
++    border-bottom: 1px solid #24130F;
++}
++
++#calendar tfoot #next {
++    border-top: 1px solid #24130F;
++    text-align: right;
++}
++
++#calendar tfoot #prev {
++    border-top: 1px solid #24130F;
++}
++
++#calendar .pad {
++    border-bottom: 1px solid #24130F;
++}
++
++#calendar #today {
++    background: #24130F;
++}
++
++/* Footer */
++
++#footer {
++    width: 100%;
++    height: 100px;
++    margin: 0 auto;
++    padding: 0;
++    background: #323232 url(images/img02.jpg) repeat-x left top;
++}
++
++#footer-bgcontent {
++}
++
++#footer p {
++    margin: 0;
++    padding: 30px 0px 0px 0px;
++    text-align: center;
++    line-height: normal;
++    text-transform: uppercase;
++    font-size: 10px;
++    color: #C7DAE5;
++}
++
++#footer a {
++}
++
++#search-results { margin: 10px; }
+diff --git a/sphinx/themes/conjunction/static/underscore.js b/sphinx/themes/conjunction/static/underscore.js
+new file mode 100644
+--- /dev/null
++++ b/sphinx/themes/conjunction/static/underscore.js
+@@ -0,0 +1,16 @@
++(function(){var j=this,n=j._,i=function(a){this._wrapped=a},m=typeof StopIteration!=="undefined"?StopIteration:"__break__",b=j._=function(a){return new i(a)};if(typeof exports!=="undefined")exports._=b;var k=Array.prototype.slice,o=Array.prototype.unshift,p=Object.prototype.toString,q=Object.prototype.hasOwnProperty,r=Object.prototype.propertyIsEnumerable;b.VERSION="0.5.5";b.each=function(a,c,d){try{if(a.forEach)a.forEach(c,d);else if(b.isArray(a)||b.isArguments(a))for(var e=0,f=a.length;e<f;e++)c.call(d,
++a[e],e,a);else{var g=b.keys(a);f=g.length;for(e=0;e<f;e++)c.call(d,a[g[e]],g[e],a)}}catch(h){if(h!=m)throw h;}return a};b.map=function(a,c,d){if(a&&b.isFunction(a.map))return a.map(c,d);var e=[];b.each(a,function(f,g,h){e.push(c.call(d,f,g,h))});return e};b.reduce=function(a,c,d,e){if(a&&b.isFunction(a.reduce))return a.reduce(b.bind(d,e),c);b.each(a,function(f,g,h){c=d.call(e,c,f,g,h)});return c};b.reduceRight=function(a,c,d,e){if(a&&b.isFunction(a.reduceRight))return a.reduceRight(b.bind(d,e),c);
++var f=b.clone(b.toArray(a)).reverse();b.each(f,function(g,h){c=d.call(e,c,g,h,a)});return c};b.detect=function(a,c,d){var e;b.each(a,function(f,g,h){if(c.call(d,f,g,h)){e=f;b.breakLoop()}});return e};b.select=function(a,c,d){if(a&&b.isFunction(a.filter))return a.filter(c,d);var e=[];b.each(a,function(f,g,h){c.call(d,f,g,h)&&e.push(f)});return e};b.reject=function(a,c,d){var e=[];b.each(a,function(f,g,h){!c.call(d,f,g,h)&&e.push(f)});return e};b.all=function(a,c,d){c=c||b.identity;if(a&&b.isFunction(a.every))return a.every(c,
++d);var e=true;b.each(a,function(f,g,h){(e=e&&c.call(d,f,g,h))||b.breakLoop()});return e};b.any=function(a,c,d){c=c||b.identity;if(a&&b.isFunction(a.some))return a.some(c,d);var e=false;b.each(a,function(f,g,h){if(e=c.call(d,f,g,h))b.breakLoop()});return e};b.include=function(a,c){if(b.isArray(a))return b.indexOf(a,c)!=-1;var d=false;b.each(a,function(e){if(d=e===c)b.breakLoop()});return d};b.invoke=function(a,c){var d=b.rest(arguments,2);return b.map(a,function(e){return(c?e[c]:e).apply(e,d)})};b.pluck=
++function(a,c){return b.map(a,function(d){return d[c]})};b.max=function(a,c,d){if(!c&&b.isArray(a))return Math.max.apply(Math,a);var e={computed:-Infinity};b.each(a,function(f,g,h){g=c?c.call(d,f,g,h):f;g>=e.computed&&(e={value:f,computed:g})});return e.value};b.min=function(a,c,d){if(!c&&b.isArray(a))return Math.min.apply(Math,a);var e={computed:Infinity};b.each(a,function(f,g,h){g=c?c.call(d,f,g,h):f;g<e.computed&&(e={value:f,computed:g})});return e.value};b.sortBy=function(a,c,d){return b.pluck(b.map(a,
++function(e,f,g){return{value:e,criteria:c.call(d,e,f,g)}}).sort(function(e,f){e=e.criteria;f=f.criteria;return e<f?-1:e>f?1:0}),"value")};b.sortedIndex=function(a,c,d){d=d||b.identity;for(var e=0,f=a.length;e<f;){var g=e+f>>1;d(a[g])<d(c)?(e=g+1):(f=g)}return e};b.toArray=function(a){if(!a)return[];if(a.toArray)return a.toArray();if(b.isArray(a))return a;if(b.isArguments(a))return k.call(a);return b.values(a)};b.size=function(a){return b.toArray(a).length};b.first=function(a,c,d){return c&&!d?k.call(a,
++0,c):a[0]};b.rest=function(a,c,d){return k.call(a,b.isUndefined(c)||d?1:c)};b.last=function(a){return a[a.length-1]};b.compact=function(a){return b.select(a,function(c){return!!c})};b.flatten=function(a){return b.reduce(a,[],function(c,d){if(b.isArray(d))return c.concat(b.flatten(d));c.push(d);return c})};b.without=function(a){var c=b.rest(arguments);return b.select(a,function(d){return!b.include(c,d)})};b.uniq=function(a,c){return b.reduce(a,[],function(d,e,f){if(0==f||(c===true?b.last(d)!=e:!b.include(d,
++e)))d.push(e);return d})};b.intersect=function(a){var c=b.rest(arguments);return b.select(b.uniq(a),function(d){return b.all(c,function(e){return b.indexOf(e,d)>=0})})};b.zip=function(){for(var a=b.toArray(arguments),c=b.max(b.pluck(a,"length")),d=new Array(c),e=0;e<c;e++)d[e]=b.pluck(a,String(e));return d};b.indexOf=function(a,c){if(a.indexOf)return a.indexOf(c);for(var d=0,e=a.length;d<e;d++)if(a[d]===c)return d;return-1};b.lastIndexOf=function(a,c){if(a.lastIndexOf)return a.lastIndexOf(c);for(var d=
++a.length;d--;)if(a[d]===c)return d;return-1};b.range=function(a,c,d){var e=b.toArray(arguments),f=e.length<=1;a=f?0:e[0];c=f?e[0]:e[1];d=e[2]||1;e=Math.ceil((c-a)/d);if(e<=0)return[];e=new Array(e);f=a;for(var g=0;1;f+=d){if((d>0?f-c:c-f)>=0)return e;e[g++]=f}};b.bind=function(a,c){var d=b.rest(arguments,2);return function(){return a.apply(c||j,d.concat(b.toArray(arguments)))}};b.bindAll=function(a){var c=b.rest(arguments);if(c.length==0)c=b.functions(a);b.each(c,function(d){a[d]=b.bind(a[d],a)});
++return a};b.delay=function(a,c){var d=b.rest(arguments,2);return setTimeout(function(){return a.apply(a,d)},c)};b.defer=function(a){return b.delay.apply(b,[a,1].concat(b.rest(arguments)))};b.wrap=function(a,c){return function(){var d=[a].concat(b.toArray(arguments));return c.apply(c,d)}};b.compose=function(){var a=b.toArray(arguments);return function(){for(var c=b.toArray(arguments),d=a.length-1;d>=0;d--)c=[a[d].apply(this,c)];return c[0]}};b.keys=function(a){if(b.isArray(a))return b.range(0,a.length);
++var c=[];for(var d in a)q.call(a,d)&&c.push(d);return c};b.values=function(a){return b.map(a,b.identity)};b.functions=function(a){return b.select(b.keys(a),function(c){return b.isFunction(a[c])}).sort()};b.extend=function(a,c){for(var d in c)a[d]=c[d];return a};b.clone=function(a){if(b.isArray(a))return a.slice(0);return b.extend({},a)};b.tap=function(a,c){c(a);return a};b.isEqual=function(a,c){if(a===c)return true;var d=typeof a;if(d!=typeof c)return false;if(a==c)return true;if(!a&&c||a&&!c)return false;
++if(a.isEqual)return a.isEqual(c);if(b.isDate(a)&&b.isDate(c))return a.getTime()===c.getTime();if(b.isNaN(a)&&b.isNaN(c))return true;if(b.isRegExp(a)&&b.isRegExp(c))return a.source===c.source&&a.global===c.global&&a.ignoreCase===c.ignoreCase&&a.multiline===c.multiline;if(d!=="object")return false;if(a.length&&a.length!==c.length)return false;d=b.keys(a);var e=b.keys(c);if(d.length!=e.length)return false;for(var f in a)if(!b.isEqual(a[f],c[f]))return false;return true};b.isEmpty=function(a){return b.keys(a).length==
++0};b.isElement=function(a){return!!(a&&a.nodeType==1)};b.isArray=function(a){return!!(a&&a.concat&&a.unshift)};b.isArguments=function(a){return a&&b.isNumber(a.length)&&!b.isArray(a)&&!r.call(a,"length")};b.isFunction=function(a){return!!(a&&a.constructor&&a.call&&a.apply)};b.isString=function(a){return!!(a===""||a&&a.charCodeAt&&a.substr)};b.isNumber=function(a){return p.call(a)==="[object Number]"};b.isDate=function(a){return!!(a&&a.getTimezoneOffset&&a.setUTCFullYear)};b.isRegExp=function(a){return!!(a&&
++a.test&&a.exec&&(a.ignoreCase||a.ignoreCase===false))};b.isNaN=function(a){return b.isNumber(a)&&isNaN(a)};b.isNull=function(a){return a===null};b.isUndefined=function(a){return typeof a=="undefined"};b.noConflict=function(){j._=n;return this};b.identity=function(a){return a};b.breakLoop=function(){throw m;};var s=0;b.uniqueId=function(a){var c=s++;return a?a+c:c};b.template=function(a,c){a=new Function("obj","var p=[],print=function(){p.push.apply(p,arguments);};with(obj){p.push('"+a.replace(/[\r\t\n]/g,
++" ").replace(/'(?=[^%]*%>)/g,"\t").split("'").join("\\'").split("\t").join("'").replace(/<%=(.+?)%>/g,"',$1,'").split("<%").join("');").split("%>").join("p.push('")+"');}return p.join('');");return c?a(c):a};b.forEach=b.each;b.foldl=b.inject=b.reduce;b.foldr=b.reduceRight;b.filter=b.select;b.every=b.all;b.some=b.any;b.head=b.first;b.tail=b.rest;b.methods=b.functions;var l=function(a,c){return c?b(a).chain():a};b.each(b.functions(b),function(a){var c=b[a];i.prototype[a]=function(){var d=b.toArray(arguments);
++o.call(d,this._wrapped);return l(c.apply(b,d),this._chain)}});b.each(["pop","push","reverse","shift","sort","splice","unshift"],function(a){var c=Array.prototype[a];i.prototype[a]=function(){c.apply(this._wrapped,arguments);return l(this._wrapped,this._chain)}});b.each(["concat","join","slice"],function(a){var c=Array.prototype[a];i.prototype[a]=function(){return l(c.apply(this._wrapped,arguments),this._chain)}});i.prototype.chain=function(){this._chain=true;return this};i.prototype.value=function(){return this._wrapped}})();
+diff --git a/sphinx/themes/conjunction/theme.conf b/sphinx/themes/conjunction/theme.conf
+new file mode 100644
+--- /dev/null
++++ b/sphinx/themes/conjunction/theme.conf
+@@ -0,0 +1,7 @@
++[theme]
++inherit = none
++stylesheet = style.css
++pygments_style = default
++
++[options]
++nosidebar = false

@@ -1,4 +1,6 @@
 rename_files.patch
-quickstart.patch
-hooks.patch
 readme.patch
+hooks.patch
+quickstart.patch
+theme_conjunction.html
+feeds.patch

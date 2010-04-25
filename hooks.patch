@@ -1,29 +1,14 @@
 # HG changeset patch
-# Parent 9f22f388d2b183eac9896ec340cd816649acac8b
+# Parent 694bd2b3a75093e4cf4c60876cf8804d2243edcc
 
-diff --git a/hgblog/__init__.py b/hgblog/__init__.py
-new file mode 100644
-diff --git a/hgblog/generate_html.py b/hgblog/generate_html.py
-new file mode 100644
---- /dev/null
-+++ b/hgblog/generate_html.py
-@@ -0,0 +1,19 @@
-+from mercurial.match import match
-+from sphinx.cmdline import main as sphinxify
+diff -r 694bd2b3a750 hgblog/generate_html.py
+--- /dev/null	Thu Jan 01 00:00:00 1970 +0000
++++ b/hgblog/generate_html.py	Sat Apr 24 21:31:50 2010 -0400
+@@ -0,0 +1,7 @@
++from hgblog.refresh import refresh
 +
 +def htmlize_articles(ui, repo, **kwargs):
 +    """Calls on Sphinx to turn our .rst files into pretty HTML"""
 +
-+    # find all .rst files that Mercurial is currently tracking
-+    m = match(repo.root, repo.getcwd(), ('*.rst',), default='relglob')
-+    files_to_consider = repo[None].walk(m)
-+
-+    # tell Sphinx to HTML-ize the .rst files we found
-+    args = [
-+        '-bdirhtml',
-+        '-dbuild/doctrees',
-+        'source',
-+        'build/html',
-+    ] + files_to_consider
-+    sphinxify(args)
++    refresh(repo)
 +
