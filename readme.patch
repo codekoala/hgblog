@@ -1,10 +1,10 @@
 # HG changeset patch
-# Parent 73b7b304dd7cb436acbe3d17fdfa6c163b01e837
+# Parent 717b554a4598d9666e902c4b6fc3ad7ab9398c2a
 
-diff -r 73b7b304dd7c README
---- a/README	Fri Apr 23 12:23:54 2010 -0400
-+++ b/README	Fri Apr 23 17:02:48 2010 -0400
-@@ -1,33 +1,180 @@
+diff -r 717b554a4598 README
+--- a/README	Sat Apr 24 21:51:29 2010 -0400
++++ b/README	Sat Apr 24 21:53:40 2010 -0400
+@@ -1,33 +1,190 @@
  .. -*- restructuredtext -*-
  
 -=================
@@ -195,10 +195,20 @@ diff -r 73b7b304dd7c README
 +time you commit changes to the local repository and each time you update your
 +local repository using changesets pulled in from elsewhere.
 +
++Generating HTML Without Committing
++----------------------------------
++
++I realize that there are probably several times you might want to have a gander
++at the resulting HTML for your ``.rst`` files at some point before committing
++changes to the repo.  I've created a simple command to make this possible::
++
++    hgblog-refresh
++
++You should be able to call that from anywhere within your blog's Mercurial 
++repository, and your HTML files should be properly refreshed.
++
 +TODOs
 +=====
 +
-+* Implement Disqus commenting
 +* Add RSS feeds
-+* Include a simple, static HTML web server for faster results
 +

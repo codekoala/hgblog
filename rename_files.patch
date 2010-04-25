@@ -148,6 +148,18 @@ new file mode 100644
 +    repo = hg.repository(ui(), path=repo_root)
 +    return repo
 +
+diff --git a/setup.cfg b/setup.cfg
+--- a/setup.cfg
++++ b/setup.cfg
+@@ -1,6 +1,6 @@
+ [egg_info]
+-tag_build = dev
+-tag_date = true
++tag_build = 
++tag_date = false
+ 
+ [aliases]
+ release = egg_info -RDb ''
 diff --git a/setup.py b/setup.py
 --- a/setup.py
 +++ b/setup.py
