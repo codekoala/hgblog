@@ -1,9 +1,9 @@
 # HG changeset patch
-# Parent d99b593d3b04399d0c3d1bfb217f2fedf94f8b5a
+# Parent df9cf1b734b154c5802c0a20b4087351d5eb23f8
 
-diff -r d99b593d3b04 setup.py
---- a/setup.py	Sat Apr 24 20:56:24 2010 -0400
-+++ b/setup.py	Sat Apr 24 21:13:49 2010 -0400
+diff -r df9cf1b734b1 setup.py
+--- a/setup.py	Mon Apr 26 13:14:42 2010 -0400
++++ b/setup.py	Mon Apr 26 13:15:10 2010 -0400
 @@ -42,7 +42,7 @@
  <http://bitbucket.org/birkenfeld/sphinx/get/tip.gz#egg=Sphinx-dev>`_.
  '''
@@ -13,9 +13,9 @@ diff -r d99b593d3b04 setup.py
  
  if sys.version_info < (2, 4):
      print 'ERROR: Sphinx requires at least Python 2.4 to run.'
-diff -r d99b593d3b04 sphinx/quickstart.py
---- a/sphinx/quickstart.py	Sat Apr 24 20:56:24 2010 -0400
-+++ b/sphinx/quickstart.py	Sat Apr 24 21:13:49 2010 -0400
+diff -r df9cf1b734b1 sphinx/quickstart.py
+--- a/sphinx/quickstart.py	Mon Apr 26 13:14:42 2010 -0400
++++ b/sphinx/quickstart.py	Mon Apr 26 13:15:10 2010 -0400
 @@ -19,6 +19,7 @@
  from sphinx.util.console import purple, bold, red, turquoise, \
       nocolor, color_terminal
@@ -176,7 +176,7 @@ diff -r d99b593d3b04 sphinx/quickstart.py
          print
          do_prompt(d, 'path', 'Please enter a new root path (or just Enter '
                    'to exit)', '', is_path)
-@@ -699,56 +717,12 @@
+@@ -699,56 +717,14 @@
              sys.exit(1)
  
      print '''
@@ -185,7 +185,12 @@ diff -r d99b593d3b04 sphinx/quickstart.py
 -"source" and "build" directories within the root path.'''
 -    do_prompt(d, 'sep', 'Separate source and build directories (y/N)', 'n',
 -              boolean)
--
++The blog name will occur in several places in the HTML.'''
++    do_prompt(d, 'project', 'Blog name')
++    do_prompt(d, 'author', 'Author name(s)')
++    do_prompt(d, 'enable_comments', 'Would you like to enable Disqus comments '
++              'on your pages?', 'y', boolean)
+ 
 -    print '''
 -Inside the root directory, two more directories will be created; "_templates"
 -for custom HTML templates and "_static" for custom stylesheets and other static
@@ -195,9 +200,7 @@ diff -r d99b593d3b04 sphinx/quickstart.py
 -    print '''
 -The project name will occur in several places in the built documentation.'''
 -    do_prompt(d, 'project', 'Project name')
-+The blog name will occur in several places in the HTML.'''
-+    do_prompt(d, 'project', 'Blog name')
-     do_prompt(d, 'author', 'Author name(s)')
+-    do_prompt(d, 'author', 'Author name(s)')
 -    print '''
 -Sphinx has the notion of a "version" and a "release" for the
 -software. Each version can have multiple releases. For example, for
@@ -232,13 +235,12 @@ diff -r d99b593d3b04 sphinx/quickstart.py
 -Sphinx can also add configuration for epub output:'''
 -    do_prompt(d, 'epub', 'Do you want to use the epub builder (y/N)',
 -              'n', boolean)
-+    do_prompt(d, 'enable_comments', 'Would you like to enable Disqus comments '
-+              'on your pages?', 'y', boolean)
-+    do_prompt(d, 'disqus_site', 'What is the name of your Disqus site?')
++    if d['enable_comments']:
++        do_prompt(d, 'disqus_site', 'What is the name of your Disqus site?')
  
      print '''
  Please indicate if you want to use one of the following Sphinx extensions:'''
-@@ -775,7 +749,7 @@
+@@ -775,7 +751,7 @@
                'of documented Python objects (y/N)', 'n', boolean)
      print '''
  A Makefile and a Windows command file can be generated for you so that you
@@ -247,7 +249,7 @@ diff -r d99b593d3b04 sphinx/quickstart.py
  directly.'''
      do_prompt(d, 'makefile', 'Create Makefile? (Y/n)', 'y', boolean)
      do_prompt(d, 'batchfile', 'Create Windows command file? (Y/n)',
-@@ -793,19 +767,42 @@
+@@ -793,19 +769,42 @@
      d['copyright'] = time.strftime('%Y') + ', ' + d['author']
      d['author_texescaped'] = unicode(d['author']).\
                               translate(texescape.tex_escape_map)
@@ -293,7 +295,7 @@ diff -r d99b593d3b04 sphinx/quickstart.py
      srcdir = d['sep'] and path.join(d['path'], 'source') or d['path']
  
      mkdir_p(srcdir)
-@@ -834,6 +831,11 @@
+@@ -834,6 +833,11 @@
      f.write((MASTER_FILE % d).encode('utf-8'))
      f.close()
  
@@ -305,7 +307,7 @@ diff -r d99b593d3b04 sphinx/quickstart.py
      if d['makefile']:
          d['rsrcdir'] = d['sep'] and 'source' or '.'
          d['rbuilddir'] = d['sep'] and 'build' or d['dot'] + 'build'
-@@ -849,20 +851,13 @@
+@@ -849,20 +853,13 @@
          f.write((BATCHFILE % d).encode('utf-8'))
          f.close()
  
