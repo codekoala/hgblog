@@ -1,5 +1,5 @@
 # HG changeset patch
-# Parent ea003da8d9ea9446534fef1de24f40c1162ce66d
+# Parent d871f3d6f47ca044ca689c61894c627a08c5db1d
 
 diff --git a/sphinx/builders/changes.py b/sphinx/builders/changes.py
 --- a/sphinx/builders/changes.py
@@ -483,7 +483,6 @@ new file mode 100644
 +    {%- endblock %}
 +    <div class="clearer"></div>
 +    </div>
-+{%- block relbar2 %}{{ relbar() }}{% endblock %}
 +{%- endblock %}
 +
 +{%- if enable_comments %}
@@ -506,6 +505,7 @@ new file mode 100644
 +    <a href="http://disqus.com" class="dsq-brlink">blog comments powered by <span class="logo-disqus">Disqus</span></a>
 +{%- endif %}
 +{%- endif %}
++{%- block relbar2 %}{{ relbar() }}{% endblock %}
 +
 +    </div><!-- end #content -->
 +
