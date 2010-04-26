@@ -1,9 +1,9 @@
 # HG changeset patch
-# Parent 8a2adc556d541e0a6ebe18883e755b987bb432d2
+# Parent 1d3915c21216e04840607d0c04f4a79c93c9a0a1
 
-diff -r 8a2adc556d54 hgblog/generate_html.py
+diff -r 1d3915c21216 hgblog/generate_html.py
 --- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/hgblog/generate_html.py	Mon Apr 26 13:02:28 2010 -0400
++++ b/hgblog/generate_html.py	Mon Apr 26 16:06:16 2010 -0400
 @@ -0,0 +1,7 @@
 +from hgblog.refresh import refresh
 +
@@ -12,10 +12,10 @@ diff -r 8a2adc556d54 hgblog/generate_html.py
 +
 +    refresh(repo)
 +
-diff -r 8a2adc556d54 hgblog/refresh.py
---- a/hgblog/refresh.py	Mon Apr 26 13:01:22 2010 -0400
-+++ b/hgblog/refresh.py	Mon Apr 26 13:02:28 2010 -0400
-@@ -1,13 +1,13 @@
+diff -r 1d3915c21216 hgblog/refresh.py
+--- a/hgblog/refresh.py	Mon Apr 26 13:21:40 2010 -0400
++++ b/hgblog/refresh.py	Mon Apr 26 16:06:16 2010 -0400
+@@ -1,19 +1,15 @@
 -from mercurial.match import match
 -from mercurial.ui import ui
 -from sphinx.cmdline import main as sphinxify
@@ -26,23 +26,66 @@ diff -r 8a2adc556d54 hgblog/refresh.py
  def refresh(repo=None):
      """Calls on Sphinx to turn our .rst files into pretty HTML"""
  
-+    from mercurial.match import match
-+    from mercurial.ui import ui
 +    from sphinx.cmdline import main as sphinxify
-+    from hgblog.utils import get_repo
++    from hgblog.utils import get_repo, get_tracked_rst_files
 +
      if repo is None:
          repo = get_repo()
  
-diff -r 8a2adc556d54 hgblog/utils.py
---- a/hgblog/utils.py	Mon Apr 26 13:01:22 2010 -0400
-+++ b/hgblog/utils.py	Mon Apr 26 13:02:28 2010 -0400
-@@ -1,9 +1,10 @@
+-    # find all .rst files that Mercurial is currently tracking
+-    m = match(repo.root, repo.getcwd(), ('*.rst',))
+-    files_to_consider = repo[None].walk(m)
++    files_to_consider = get_tracked_rst_files(repo)
+ 
+     # tell Sphinx to HTML-ize the .rst files we found
+     args = [
+diff -r 1d3915c21216 hgblog/utils.py
+--- a/hgblog/utils.py	Mon Apr 26 13:21:40 2010 -0400
++++ b/hgblog/utils.py	Mon Apr 26 16:06:16 2010 -0400
+@@ -1,9 +1,48 @@
 -from mercurial.cmdutil import findrepo
 -from mercurial import hg
 -from mercurial.ui import ui
  import os
  
++def get_tracked_rst_files(repo=None):
++    """Returns a list of .rst files that are under version control"""
++
++    #from mercurial.match import match
++    from mercurial.cmdutil import match
++
++    if repo is None:
++        repo = get_repo()
++
++    m = match(repo, ('*.rst',), {}, default='relglob')
++    tracked = filter(lambda f: f in repo.dirstate, repo[None].walk(m))
++    return [os.path.join(repo.root, f) for f in tracked]
++
++def get_untracked_rst_files(repo=None):
++    """Returns a list of all .rst files that are not currently tracked by
++    Mercurial"""
++
++    if repo is None:
++        repo = get_repo()
++
++    tracked = get_tracked_rst_files(repo)
++    all_files = []
++
++    for path, dirs, files in os.walk(repo.root):
++        for d in dirs:
++            if d.startswith('.'):
++                dirs.remove(d)
++
++        rst_files = filter(lambda s: s.endswith('.rst'), files)
++
++        for f in rst_files:
++            full_path = os.path.join(path, f)
++            all_files.append(full_path)
++
++    untracked = filter(lambda f: f not in tracked, all_files)
++    source = os.path.join(repo.root, 'source')
++    return [f.replace(source, '').strip('/') for f in untracked]
++
  def get_repo(path=None):
 +    from mercurial.cmdutil import findrepo
 +    from mercurial import hg
