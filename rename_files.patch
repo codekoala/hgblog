@@ -57,7 +57,7 @@ new file mode 100644
 @@ -0,0 +1,4 @@
 +from server import serve
 +
-+__version__ = '0.2'
++__version__ = '0.3'
 +
 diff --git a/hgblog/refresh.py b/hgblog/refresh.py
 new file mode 100644
